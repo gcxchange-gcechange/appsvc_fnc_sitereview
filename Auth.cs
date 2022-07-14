@@ -65,7 +65,7 @@ namespace SiteReview
                 }
             };
 
-            var client = new SecretClient(new System.Uri(Globals.keyVaultUrl), new DefaultAzureCredential(), options);
+            var client = new SecretClient(new Uri(Globals.keyVaultUrl), new DefaultAzureCredential(), options);
             KeyVaultSecret secret = client.GetSecret(Globals.secretNameAppOnly);
             var secretValue = secret.Value;
 

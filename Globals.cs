@@ -15,6 +15,14 @@ namespace SiteReview
         public static readonly string appOnlyId = GetEnvironmentVariable("appOnlyId");
         public static readonly string secretNameAppOnly = GetEnvironmentVariable("secretNameAppOnly");
 
+        public static List<string> GetExcludedSiteIds()
+        {
+            var excludedSiteIds = new List<string>(GetEnvironmentVariable("excludeSiteIds").Replace(" ", "").Split(","));
+            excludedSiteIds.Add(hubId);
+
+            return excludedSiteIds;
+        }
+
         private static string GetEnvironmentVariable(string name)
         {
             return System.Environment.GetEnvironmentVariable(name, System.EnvironmentVariableTarget.Process);

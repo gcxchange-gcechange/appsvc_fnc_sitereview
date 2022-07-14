@@ -3,6 +3,7 @@ This function app looks for sites and teams that are inactive for more than 60 d
 ##  API Permissions
 Your app registration will need the following API permissions
 ### Microsoft Graph
-TBD
+Reports.Read.All - Read all usage reports
+Mail.Send - Send mail as any user
 ## How To Setup
-TBD
+You will need to disable the option that conceals user, group, and site names in all reports. This can be done [in the admin panel](https://admin.microsoft.com/AdminPortal/Home#/Settings/Services/:/Settings/L1/Reports)
