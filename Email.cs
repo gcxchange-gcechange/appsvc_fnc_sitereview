@@ -9,62 +9,61 @@ namespace SiteReview
 {
     public static class Email
     {
-        public static async Task<List<Tuple<User, bool>>> InformSiteOwners(Site site, GraphServiceClient graphAPIAuth, ILogger log)
+        public static async Task<bool> SendWarningEmail(string userEmail, ILogger log)
         {
-            var results = new List<Tuple<User, bool>>();
+            return await SendEmail(
+                userEmail,
+                "English Subject | French Subject",
+                @"
+                        (La version française suit)
 
-            var groupQueryOptions = new List<QueryOption>()
-            {
-                new QueryOption("$search", "\"mailNickname:" + site.Name +"\"")
-            };
+                        Hello, 
 
-            var groups = await graphAPIAuth.Groups
-            .Request(groupQueryOptions)
-            .Header("ConsistencyLevel", "eventual")
-            .GetAsync();
+                        TODO: Write English copy 
+                         
+                        Regards, 
+                        The GCX Team 
 
-            do
-            {
-                foreach (var group in groups)
-                {
-                    var owners = await graphAPIAuth.Groups[group.Id].Owners
-                    .Request()
-                    .GetAsync();
+                        --------------------------------------
 
-                    do
-                    {
-                        foreach (var owner in owners)
-                        {
-                            var user = await graphAPIAuth.Users[owner.Id]
-                            .Request()
-                            .Select("displayName,mail")
-                            .GetAsync();
+                        Bonjour, 
 
-                            if (user != null)
-                            {
-                                var result = await SendEmail(user.DisplayName, user.Mail, log);
-                                results.Add(new Tuple<User, bool>(user, result));
-                            }
-                        }
-                    }
-                    while (owners.NextPageRequest != null && (owners = await owners.NextPageRequest.GetAsync()).Count > 0);
-                }
-            }
-            while (groups.NextPageRequest != null && (groups = await groups.NextPageRequest.GetAsync()).Count > 0);
-
-            return results;
+                        TODO: Write French copy
+                         
+                        Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
+                        Équipe de GCÉchange", 
+                log
+            );
         }
 
-        public static async Task<List<Tuple<User, bool>>> InformTeamOwners(Team team, GraphServiceClient graphAPIAuth, ILogger log)
+        public static async Task<bool> SendDeleteEmail(string userEmail, ILogger log)
         {
-            var results = new List<Tuple<User, bool>>();
+            return await SendEmail(
+                userEmail, 
+                "English Subject | French Subject",
+                @"
+                        (La version française suit)
 
-            // TODO: Get team owners and send email
+                        Hello, 
 
-            return results;
+                        TODO: Write English copy 
+                         
+                        Regards, 
+                        The GCX Team 
+
+                        --------------------------------------
+
+                        Bonjour, 
+
+                        TODO: Write French copy
+                         
+                        Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
+                        Équipe de GCÉchange", 
+                log
+            );
         }
 
-        public static async Task<bool> SendEmail(string Username, string UserEmail, ILogger log)
+        private static async Task<bool> SendEmail(string userEmail, string emailSubject, string emailBody, ILogger log)
         {
             var res = true;
             var auth = new Auth();
@@ -74,28 +73,11 @@ namespace SiteReview
             {
                 var message = new Message
                 {
-                    Subject = "English Subject | French Subject",
+                    Subject = emailSubject,
                     Body = new ItemBody
                     {
                         ContentType = BodyType.Text,
-                        Content = @$"
-                        (La version française suit)
-
-                        Dear { Username }, 
-
-                        TODO: Write English copy 
-                         
-                        Regards, 
-                        The GCX Team 
-
-                        --------------------------------------
-
-                        Bonjour { Username }, 
-
-                        TODO: Write French copy
-                         
-                        Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
-                        Équipe de GCÉchange"
+                        Content = emailBody
                     },
                     ToRecipients = new List<Recipient>()
                     {
@@ -103,7 +85,7 @@ namespace SiteReview
                         {
                             EmailAddress = new EmailAddress
                             {
-                                Address = UserEmail
+                                Address = userEmail
                             }
                         }
                     }
@@ -114,11 +96,11 @@ namespace SiteReview
                 .Request()
                 .PostAsync();
 
-                log.LogInformation($"Email sent to {UserEmail}");
+                log.LogInformation($"Email sent to {userEmail}");
             }
             catch (Exception ex)
             {
-                log.LogError($"Error sending email to {UserEmail}: {ex.Message}");
+                log.LogError($"Error sending email to {userEmail}: {ex.Message}");
                 res = false;
             }
 

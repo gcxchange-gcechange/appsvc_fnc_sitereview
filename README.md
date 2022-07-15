@@ -4,6 +4,9 @@ This function app looks for sites and teams that are inactive for more than 60 d
 Your app registration will need the following API permissions
 ### Microsoft Graph
 Reports.Read.All - Read all usage reports
+Sites.Read.All - Read items in all site collections
 Mail.Send - Send mail as any user
+### App Only
+http://sharepoint/content/sitecollection - Full Control
 ## How To Setup
 You will need to disable the option that conceals user, group, and site names in all reports. This can be done [in the admin panel](https://admin.microsoft.com/AdminPortal/Home#/Settings/Services/:/Settings/L1/Reports)
