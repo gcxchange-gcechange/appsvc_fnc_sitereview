@@ -9,7 +9,7 @@ namespace SiteReview
 {
     public static class Email
     {
-        public static async Task<bool> SendWarningEmail(string userEmail, ILogger log)
+        public static async Task<bool> SendWarningEmail(string userEmail, string siteUrl, ILogger log)
         {
             return await SendEmail(
                 userEmail,
@@ -36,7 +36,7 @@ namespace SiteReview
             );
         }
 
-        public static async Task<bool> SendDeleteEmail(string userEmail, ILogger log)
+        public static async Task<bool> SendDeleteEmail(string userEmail, string siteUrl, ILogger log)
         {
             return await SendEmail(
                 userEmail, 
