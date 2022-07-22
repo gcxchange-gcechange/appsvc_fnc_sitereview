@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using Microsoft.Graph;
 using Microsoft.Online.SharePoint.TenantAdministration;
+using System.Linq;
 
 namespace SiteReview
 {
@@ -25,7 +26,7 @@ namespace SiteReview
             
             // Get a report of site usage in the last 180 days
             var reportMsg = graphAPIAuth.Reports
-            .GetTeamsUserActivityCounts("D180") //GetTeamsUserActivityUserDetail - GetSharePointSiteUsageDetail
+            .GetSharePointSiteUsageDetail("D180") //GetTeamsUserActivityUserDetail - GetSharePointSiteUsageDetail
             .Request()
             .Header("ConsistencyLevel", "eventual")
             .GetHttpRequestMessage();
@@ -43,11 +44,31 @@ namespace SiteReview
             var lastActivityIndex = report[0].FindIndex(l => l.Equals("Last Activity Date"));
             var siteURLIndex = report[0].FindIndex(l => l.Equals("Site URL"));
 
-            // Skip over any excluded sites
             var excludeSiteIds = Globals.GetExcludedSiteIds();
+            var subsiteIds = new List<string>();
+
+            // Get subsites
+            var sitesQueryOptions = new List<QueryOption>()
+            {
+                new QueryOption("search", "DepartmentId:{" + Globals.hubId + "}"),
+            };
+
+            var subsites = await graphAPIAuth.Sites
+            .Request(sitesQueryOptions)
+            .Header("ConsistencyLevel", "eventual")
+            .GetAsync();
+
+            do
+            {
+                foreach (var site in subsites)
+                {
+                    subsiteIds.Add(site.Id.Split(",")[1]);
+                }
+            }
+            while (subsites.NextPageRequest != null && (subsites = await subsites.NextPageRequest.GetAsync()).Count > 0);
 
             var warningSites = new List<Tuple<string, string>>();
-            var deleteSites= new List<Tuple<string, string>>();
+            var deleteSites = new List<Tuple<string, string>>();
 
             // Build the list of warning and delete sites
             for (var i = 1; i < report.Count; i++)
@@ -58,21 +79,26 @@ namespace SiteReview
 
                 if (lastActivityDate != string.Empty)
                 {
+                    // Skip excluded sites
                     if (excludeSiteIds.Contains(siteId))
                         continue;
 
-                    var siteData = new Tuple<string, string>(siteId, siteURL);
-                    var daysInactive = (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays;
-                    
-                    if (daysInactive > 120)
+                    // If the site is a subsite
+                    if (subsiteIds.Any(s => s == siteId))
                     {
-                        deleteSites.Add(siteData);
-                        log.LogWarning($"Flagged for deletion: {siteURL}");
-                    }
-                    else if (daysInactive > 60)
-                    {
-                        deleteSites.Add(siteData);
-                        log.LogWarning($"Flagged for warning: {siteURL}");
+                        var siteData = new Tuple<string, string>(siteId, siteURL);
+                        var daysInactive = (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays;
+
+                        if (daysInactive > 120)
+                        {
+                            deleteSites.Add(siteData);
+                            log.LogWarning($"Flagged for deletion: {siteURL}");
+                        }
+                        else if (daysInactive > 60)
+                        {
+                            warningSites.Add(siteData);
+                            log.LogWarning($"Flagged for warning: {siteURL}");
+                        }
                     }
                 }
             }
@@ -126,7 +152,7 @@ namespace SiteReview
                     //var ctx = auth.appOnlyAuth("https://devgcx.sharepoint.com/", log);
                     //var tenant = new Tenant(ctx);
                     //
-                    //var removeSite = tenant.RemoveSite(site.WebUrl);
+                    //var removeSite = tenant.RemoveSite(s.WebUrl);
                     //ctx.Load(removeSite);
                     //ctx.ExecuteQuery();
                 }
