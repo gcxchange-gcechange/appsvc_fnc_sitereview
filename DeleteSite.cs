@@ -33,7 +33,7 @@ namespace SiteReview
 
                 if (s != null)
                 {
-                    await Common.DeleteSite(site.SiteUrl, graphAPIAuth, log);
+                    await Common.DeleteSite(site.SiteUrl, log);
                 }
             }
 

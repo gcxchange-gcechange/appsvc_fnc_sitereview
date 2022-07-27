@@ -178,7 +178,7 @@ namespace SiteReview
             return success;
         }
 
-        public static async Task<bool> DeleteSite(string siteUrl, GraphServiceClient graphAPIAuth, ILogger log)
+        public static async Task<bool> DeleteSite(string siteUrl, ILogger log)
         {
             var success = true;
 

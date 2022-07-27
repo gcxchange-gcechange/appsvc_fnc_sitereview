@@ -2,7 +2,6 @@
 using Microsoft.Graph;
 using System;
 using System.Collections.Generic;
-using System.Net.Mail;
 using System.Threading.Tasks;
 
 namespace SiteReview
@@ -13,25 +12,25 @@ namespace SiteReview
         {
             return await SendEmail(
                 userEmail,
-                "English Subject | French Subject",
-                @"
-                        (La version française suit)
+                "An important message from GCXchange | Un message important de GCÉchange",
+                $@"
+                (La version française suit)
 
-                        Hello, 
+                Hello,
 
-                        TODO: Write English copy 
-                         
-                        Regards, 
-                        The GCX Team 
+                TODO: Write warning email (en)
 
-                        --------------------------------------
+                Regards, 
+                The GCX Team
+                
+                --------------------------------------
 
-                        Bonjour, 
+                Bonjour,
 
-                        TODO: Write French copy
-                         
-                        Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
-                        Équipe de GCÉchange", 
+                TODO: Write warning email (fr)
+
+                Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
+                Équipe de GCÉchange", 
                 log
             );
         }
@@ -39,26 +38,26 @@ namespace SiteReview
         public static async Task<bool> SendDeleteEmail(string userEmail, string siteUrl, ILogger log)
         {
             return await SendEmail(
-                userEmail, 
-                "English Subject | French Subject",
-                @"
-                        (La version française suit)
+                userEmail,
+                "An important message from GCXchange | Un message important de GCÉchange",
+                $@"
+                (La version française suit)
 
-                        Hello, 
+                Hello, 
 
-                        TODO: Write English copy 
-                         
-                        Regards, 
-                        The GCX Team 
+                TODO: Write English copy (en)
+                 
+                Regards, 
+                The GCX Team 
 
-                        --------------------------------------
+                --------------------------------------
 
-                        Bonjour, 
+                Bonjour, 
 
-                        TODO: Write French copy
-                         
-                        Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
-                        Équipe de GCÉchange", 
+                TODO: Write French copy (fr)
+                 
+                Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
+                Équipe de GCÉchange", 
                 log
             );
         }
