@@ -5,6 +5,7 @@ Your app registration will need the following API permissions
 ### Microsoft Graph
 Reports.Read.All - Read all usage reports
 Sites.Read.All - Read items in all site collections
+Group.ReadWrite.All - Read and write all groups
 Mail.Send - Send mail as any user
 ### App Only
 http://sharepoint/content/sitecollection - Full Control
