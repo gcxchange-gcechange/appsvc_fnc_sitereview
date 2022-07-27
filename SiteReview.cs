@@ -40,7 +40,7 @@ namespace SiteReview
                 }
                 else
                 {
-                    await Email.SendWarningEmail("gcxgce-admin", site.SiteUrl, log); // TODO: Get correct email address
+                    await Email.SendWarningEmail("gcxgce-admin@tbs-sct.gc.ca", site.SiteUrl, log);
                 }
             }
 
@@ -58,7 +58,7 @@ namespace SiteReview
                 }
                 else
                 {
-                    await Email.SendDeleteEmail("gcxgce-admin", site.SiteUrl, log); // TODO: Get correct email address
+                    await Email.SendDeleteEmail("gcxgce-admin@tbs-sct.gc.ca", site.SiteUrl, log);
                 }
 
                 var s = graphAPIAuth.Sites[site.SiteId]
