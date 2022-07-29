@@ -13,8 +13,7 @@ namespace SiteReview
     {
         [FunctionName("InformOwnersAndDeleteGroups")]
         public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
-            ILogger log)
+            [TimerTrigger("0 0 0 * 0-11 6")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReview executed at {DateTime.Now}");
 
@@ -44,7 +43,7 @@ namespace SiteReview
                 }
             }
 
-            // Delete sites and inform owners
+            // Delete groups and inform owners
             foreach (var site in report.DeleteSites)
             {
                 var siteOwners = await Common.GetSiteOwners(site.SiteId, graphAPIAuth);

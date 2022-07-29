@@ -199,14 +199,6 @@ namespace SiteReview
             return success;
         }
 
-        [FunctionName("SiteReview")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
-            ILogger log)
-        {
-            return new OkObjectResult("Function app executed successfully");
-        }
-
         public class SiteReport
         {
             public List<ReportData> WarningSites { get; set; }

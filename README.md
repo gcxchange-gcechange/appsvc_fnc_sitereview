@@ -8,8 +8,8 @@ Your app registration will need the following API permissions
 - Group.ReadWrite.All - Read and write all groups
 - Mail.Send - Send mail as any user
 ### App Only
-http://sharepoint/content/sitecollection - Full Control
-http://sharepoint/content/tenant - Full Control
+- http://sharepoint/content/sitecollection - Full Control
+- http://sharepoint/content/tenant - Full Control
 ## How To Setup
 You will need to disable the option that conceals user, group, and site names in all reports. This can be done [in the admin panel](https://admin.microsoft.com/AdminPortal/Home#/Settings/Services/:/Settings/L1/Reports)
 The function app expects the following values:
