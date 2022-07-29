@@ -13,7 +13,7 @@ namespace SiteReview
     {
         [FunctionName("DeleteSites")]
         public static async Task<IActionResult> Run(
-            [TimerTrigger("0 0 0 * 0-11 0")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+            [TimerTrigger("0 0 0 2 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReview executed at {DateTime.Now}");
 
