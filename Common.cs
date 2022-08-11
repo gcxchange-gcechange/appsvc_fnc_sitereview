@@ -14,6 +14,8 @@ namespace SiteReview
 {
     public static class Common
     {
+        public static readonly string DeleteSiteIdsContainerName = "delete";
+
         public static async Task<SiteReport> GetReport(GraphServiceClient graphAPIAuth, ILogger log)
         {
             // Get a report of site usage in the last 180 days
@@ -192,6 +194,7 @@ namespace SiteReview
             }
             catch (Exception ex)
             {
+                // This will sometimes throw an error complaining about not being able to find a file path, but the site is successfully deleted.
                 log.LogError($"Error deleting {siteUrl} - {ex}");
                 success = false;
             }

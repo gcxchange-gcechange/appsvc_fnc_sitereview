@@ -2,8 +2,6 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 
@@ -20,19 +18,19 @@ namespace SiteReview
             var auth = new Auth();
             var graphAPIAuth = auth.graphAuth(log);
 
-            var report = await Common.GetReport(graphAPIAuth, log); 
+            var siteIds = await StoreData.GetSitesToDelete(executionContext, Common.DeleteSiteIdsContainerName, log);
 
-            foreach (var site in report.DeleteSites)
+            foreach (var id in siteIds)
             {
-                var s = graphAPIAuth.Sites[site.SiteId]
+                var site = graphAPIAuth.Sites[id]
                 .Request()
                 .Header("ConsistencyLevel", "eventual")
                 .GetAsync()
                 .Result;
-
-                if (s != null)
+                
+                if (site != null)
                 {
-                    await Common.DeleteSite(site.SiteUrl, log);
+                    await Common.DeleteSite(site.WebUrl, log);
                 }
             }
 
