@@ -1,5 +1,5 @@
 ##  Site Review Function App
-This function app looks for sites and teams that are inactive for more than 60 days or more than 120 days. Owners of the site or team will be informed after 60 days that their site or team has been flagged for deletion. After 120 days those teams or sites will be deleted and the owners will be informed. This function app runs on a monthly timer.
+This function app looks for sites that are inactive for more than 60 days or more than 120 days. Owners of the site or team will be informed after 60 days that their site has been flagged for deletion. After 120 days those sites will be deleted and the owners will be informed. This function app runs on a monthly timer. There are two functions, one informs owners, deletes the site teams, and stores the site ids in blob storage. The second function runs 24 hours later and deletes the sites using the ids in blob storage. The delay between the two is so there is enough time that the team is no long associated with the site and we can successfully remove the site.
 ##  API Permissions
 Your app registration will need the following API permissions
 ### Microsoft Graph
