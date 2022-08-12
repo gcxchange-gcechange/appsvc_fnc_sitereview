@@ -14,7 +14,7 @@ namespace SiteReview
         public static async Task<IActionResult> Run(
             [TimerTrigger("0 0 0 1 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
-            log.LogInformation($"SiteReview executed at {DateTime.Now}");
+            log.LogInformation($"InformOwnersAndDeleteGroups executed at {DateTime.Now}");
 
             var auth = new Auth();
             var graphAPIAuth = auth.graphAuth(log);

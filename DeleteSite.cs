@@ -13,12 +13,14 @@ namespace SiteReview
         public static async Task<IActionResult> Run(
             [TimerTrigger("0 0 0 2 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
-            log.LogInformation($"SiteReview executed at {DateTime.Now}");
+            log.LogInformation($"DeleteSites executed at {DateTime.Now}");
 
             var auth = new Auth();
             var graphAPIAuth = auth.graphAuth(log);
 
             var siteIds = await StoreData.GetSitesToDelete(executionContext, Common.DeleteSiteIdsContainerName, log);
+
+            log.LogInformation($"Found {siteIds.Count} sites to be deleted");
 
             foreach (var id in siteIds)
             {

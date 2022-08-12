@@ -62,8 +62,6 @@ namespace SiteReview
             while (subsites.NextPageRequest != null && (subsites = await subsites.NextPageRequest.GetAsync()).Count > 0);
 
             var siteReport = new SiteReport();
-            var warningSites = new List<Tuple<string, string>>();
-            var deleteSites = new List<Tuple<string, string>>();
 
             // Build the list of warning and delete sites
             for (var i = 1; i < report.Count; i++)
@@ -204,6 +202,12 @@ namespace SiteReview
 
         public class SiteReport
         {
+            public SiteReport()
+            {
+                WarningSites = new List<ReportData>();
+                DeleteSites = new List<ReportData>();
+            }
+
             public List<ReportData> WarningSites { get; set; }
             public List<ReportData> DeleteSites { get; set; }
         }
