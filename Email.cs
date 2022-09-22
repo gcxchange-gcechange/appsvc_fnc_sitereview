@@ -16,18 +16,34 @@ namespace SiteReview
                 $@"
                 (La version française suit)
 
-                Hello,
+                Dear GCXchange community owner,
 
-                TODO: Write warning email (en)
+                Thank you for your interest and participation as a community owner on the GCXchange platform.
+
+                Communities continue to be our most popular feature, and we look forward to seeing new users joining various communities on the platform as activity and engagement grows.
+
+                Due to the popularity of communities, we are continuously ensuring that users can easily browse and find other engaged members that share their interests. Therefore, we permanently remove any community that has been inactive for 120 days. The inactive status changes when you or another registered user views the community page, or once a content update occurs on the site such as editing the text on your splash page or uploading a file to your site.
+
+                Today, we wish to inform you that your community has been inactive for 60 days. You must resume activity within your community by engaging with others, otherwise the site and all materials will be deleted in 60 more days. If you feel that your site is no longer needed or that it has fulfilled its purpose, please let us know and we can supply instructions on how to remove your community presence from the GCXchange platform.
+
+                Please let us know if you have any questions or concerns, and once again thank you for being a valued member of GCXchange.
 
                 Regards, 
                 The GCX Team
                 
                 --------------------------------------
 
-                Bonjour,
+                Cher ou chère responsable de collectivité de GCÉchange,
 
-                TODO: Write warning email (fr)
+                Merci de l’intérêt que vous portez et de votre participation à titre de responsable d’une collectivité sur la plateforme GCÉchange.
+
+                Les collectivités demeurent notre fonctionnalité la plus populaire et nous sommes impatients de voir de nouveaux utilisateurs se joindre à différentes collectivités sur la plateforme au fur et à mesure de la croissance de l’activité et de la mobilisation.
+
+                En raison de la popularité des collectivités, nous veillons continuellement à ce que les utilisateurs puissent naviguer facilement et trouver d’autres membres mobilisés qui partagent leurs intérêts. Par conséquent, nous éliminons de manière permanente toute collectivité qui a été inactive pendant 120 jours. L’état inactif change lorsque vous ou un autre utilisateur inscrit visionnez la page de la collectivité ou lorsqu’une mise à jour est apportée au contenu dans le site, par exemple lorsque vous modifiez le texte de votre page d’entrée ou lorsque vous téléversez un fichier dans votre site.
+
+                Aujourd’hui, nous souhaitons vous informer que votre collectivité est inactive depuis 60 jours. Vous devez reprendre l’activité dans votre collectivité en discutant avec d’autres, autrement le site et tous les documents y afférents seront supprimés dans 60 jours. Si vous estimez que votre site n’est plus nécessaire ou qu’il a rempli son objectif, veuillez nous en informer et nous vous fournirons des instructions sur la façon de supprimer la présence de votre collectivité de la plateforme de GCÉchange.
+
+                Veuillez nous indiquer si vous avez des questions ou des préoccupations et, une fois de plus, nous vous remercions d’être un membre important de GCÉchange. 
 
                 Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
                 Équipe de GCÉchange", 
