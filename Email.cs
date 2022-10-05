@@ -59,18 +59,34 @@ namespace SiteReview
                 $@"
                 (La version française suit)
 
-                Hello, 
+                Dear GCXchange community owner, 
 
-                TODO: Write English copy (en)
+                You are receiving this communication today as a follow-up to the 60-day warning for inactive communities e-mail previously sent to you.
+
+                Due to the popularity of communities, we are continuously ensuring that users can easily browse and find other engaged members that share their interests. Therefore, we permanently remove any community that has been inactive for 120 days.
+
+                Today, we wish to inform you that your community has been inactive for 120 days. Therefore, the GCXchange Team has proceeded to remove your community presence from the platform.
+
+                If in the future you would like to create a new community for interdepartmental collaboration, then please return to the Community section of the GCXchange website. We will be happy to welcome you back!
+
+                Please let us know if you have any questions or concerns, and once again thank you for being a valued member of GCXchange.
                  
                 Regards, 
                 The GCX Team 
 
                 --------------------------------------
 
-                Bonjour, 
+                Cher ou chère responsable de la collectivité de GCÉchange, 
 
-                TODO: Write French copy (fr)
+                Vous recevez aujourd’hui la présente communication qui fait suite au courriel de mise en garde qui vous a été envoyé précédemment au sujet de l'avis concernant les collectivités inactives pendant 60 jours.
+
+                En raison de la popularité des collectivités, nous veillons continuellement à ce que les utilisateurs puissent naviguer facilement et trouver d’autres membres mobilisés qui partagent leurs intérêts. Par conséquent, nous éliminons de manière permanente toute collectivité qui a été inactive pendant 120 jours.
+
+                Aujourd’hui, nous souhaitons vous informer que votre collectivité a été inactive pendant 120 jours. L’équipe de GCÉchange a donc supprimé votre collectivité de la plateforme. 
+
+                Si, à l’avenir, vous souhaitez créer une nouvelle collectivité pour une collaboration interministérielle, veuillez retourner à la section Collectivités du site GCÉchange. Nous serons heureux de vous accueillir à nouveau. 
+
+                Veuillez nous indiquer si vous avez des questions ou des préoccupations et, une fois de plus, nous vous remercions d’être un membre important de GCÉchange.
                  
                 Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
                 Équipe de GCÉchange", 
