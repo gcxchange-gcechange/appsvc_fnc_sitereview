@@ -6,6 +6,7 @@ Your app registration will need the following API permissions
 - Reports.Read.All - Read all usage reports
 - Sites.Read.All - Read items in all site collections
 - Group.ReadWrite.All - Read and write all groups
+- User.Read.All - Read all users' full profiles
 - Mail.Send - Send mail as any user
 ### App Only
 - http://sharepoint/content/sitecollection - Full Control
@@ -17,8 +18,14 @@ The function app expects the following values:
 - **hubId** - The site ID for the hub site. All subsites will be scanned.
 - **clientId** - The app registration client ID
 - **appOnlyId** - The app only ID created in SharePoint
+- **appOnlySiteUrl** - The SharePoint site url where you set up the app-principal. (eg https://{your-tenant}-admin.sharepoint.com/)
 - **keyVaultUrl** - The URL to the key vault containing the client and app only secrets.
 - **secretNameClient** - The name of the client secret in your key vault
 - **secretNameAppOnly** - The name of the app only secret in your key vault
 - **excludeSiteIds** - A string of site IDs seperated by commas. These sites will be ignored.
-- **emailSenderId** - The object ID of the user that will send emails. Make sure this user has a license to send email.
+- **emailSenderId** - The object ID of the user that will send emails. Make sure this user has a license to send email
+- **adminEmail** - The admin email address where the reports will be sent
+- **inactiveDaysWarn** - The number of days of inactivity for a site to receive a warning (min 0).
+- **inactiveDaysDelete** - The number of days of inactivity for a site to be deleted (min 0).
+- **minSiteOwners** - The minimum number of owners for a site (min 0).
+- **storageThreshold** - A number 0-100 that represents when a site has reached the storage threshhold.

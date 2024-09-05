@@ -5,40 +5,49 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using System.Collections.Generic;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.AspNetCore.Http;
+using System.Linq;
 
 namespace SiteReview
 {
     public static class SiteReview
     {
-        [FunctionName("InformOwnersAndDeleteGroups")]
+        [FunctionName("SiteReview")]
         public static async Task<IActionResult> Run(
             [TimerTrigger("0 0 0 1 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
-            log.LogInformation($"InformOwnersAndDeleteGroups executed at {DateTime.Now}");
+            log.LogInformation($"SiteReview executed at {DateTime.Now}");
 
-            var auth = new Auth();
-            var graphAPIAuth = auth.graphAuth(log);
+            var graphAPIAuth = new Auth().graphAuth(log);
 
             var report = await Common.GetReport(graphAPIAuth, log);
-            
-            log.LogInformation($"Discovered {report.WarningSites.Count} sites flagged for warning.");
-            log.LogInformation($"Discovered {report.DeleteSites.Count} sites flagged for deletion.");
+
+            log.LogInformation($"Found {report.NoOwnerSites.Count} sites with less than {Globals.minSiteOwners} owners.");
+            log.LogInformation($"Found {report.StorageThresholdSites.Count} sites over {Globals.storageThreshold}% storage capacity.");
+            log.LogInformation($"Found {report.WarningSites.Count + report.DeleteSites.Count} sites inactive for {Globals.inactiveDaysWarn} days or more.");
+            log.LogInformation($"Found {report.DeleteSites.Count} sites inactive for {Globals.inactiveDaysDelete} days or more.");
+
+            var combinedReportSites = report.WarningSites
+                .Concat(report.DeleteSites)
+                .Concat(report.NoOwnerSites)
+                .Concat(report.StorageThresholdSites)
+                .GroupBy(site => site.SiteId)
+                .Select(site => site.First())
+                .ToList();
+
+            // Send the report to the admin email address
+            await Email.SendReportEmail(Globals.adminEmail, combinedReportSites, graphAPIAuth, log);
 
             // Send warning emails to site owners
             foreach (var site in report.WarningSites)
             {
-                var siteOwners = await Common.GetSiteOwners(site.SiteId, graphAPIAuth);
-            
-                if (siteOwners.Count > 0)
+                if (site.SiteOwners.Count > 0)
                 {
-                    foreach (var owner in siteOwners)
+                    foreach (var owner in site.SiteOwners)
                     {
-                        await Email.SendWarningEmail(owner.Mail, site.SiteUrl, log);
+                        await Email.SendWarningEmail(owner.Mail, site.SiteUrl, graphAPIAuth, log);
                     }
-                }
-                else
-                {
-                    await Email.SendWarningEmail("gcxgce-admin@tbs-sct.gc.ca", site.SiteUrl, log);
                 }
             }
 
@@ -52,27 +61,21 @@ namespace SiteReview
                 .Header("ConsistencyLevel", "eventual")
                 .GetAsync()
                 .Result;
-            
+
                 if (s != null)
                 {
                     var deleteSuccess = await Common.DeleteSiteGroup(site.SiteUrl, graphAPIAuth, log);
 
                     if (deleteSuccess)
                     {
-                        var siteOwners = await Common.GetSiteOwners(site.SiteId, graphAPIAuth);
-            
-                        if (siteOwners.Count > 0)
+                        if (site.SiteOwners.Count > 0)
                         {
-                            foreach (var owner in siteOwners)
+                            foreach (var owner in site.SiteOwners)
                             {
-                                await Email.SendDeleteEmail(owner.Mail, site.SiteUrl, log);
+                                await Email.SendDeleteEmail(owner.Mail, site.SiteUrl, graphAPIAuth, log);
                             }
                         }
-                        else
-                        {
-                            await Email.SendDeleteEmail("gcxgce-admin@tbs-sct.gc.ca", site.SiteUrl, log);
-                        }
-            
+
                         deleteSiteIds.Add(site.SiteId);
                     }
                 }

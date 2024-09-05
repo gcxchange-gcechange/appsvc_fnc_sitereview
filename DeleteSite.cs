@@ -15,8 +15,7 @@ namespace SiteReview
         {
             log.LogInformation($"DeleteSites executed at {DateTime.Now}");
 
-            var auth = new Auth();
-            var graphAPIAuth = auth.graphAuth(log);
+            var graphAPIAuth = new Auth().graphAuth(log);
 
             var siteIds = await StoreData.GetSitesToDelete(executionContext, Common.DeleteSiteIdsContainerName, log);
 

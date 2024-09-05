@@ -7,10 +7,11 @@ using System.Net.Http.Headers;
 using System;
 using Microsoft.SharePoint.Client;
 using PnP.Framework;
+using System.Threading.Tasks;
 
 namespace SiteReview
 {
-    class Auth
+    public class Auth
     {
         public GraphServiceClient graphAuth(ILogger log)
         {
@@ -74,6 +75,35 @@ namespace SiteReview
             log.LogInformation($"Created app only client connection for {siteUrl}");
 
             return ctx;
+        }
+
+        public async Task<string> GetAccessTokenAsync()
+        {
+            SecretClientOptions options = new SecretClientOptions()
+            {
+                Retry =
+                {
+                    Delay = TimeSpan.FromSeconds(2),
+                    MaxDelay = TimeSpan.FromSeconds(16),
+                    MaxRetries = 5,
+                    Mode = Azure.Core.RetryMode.Exponential
+                }
+            };
+
+            var client = new SecretClient(new Uri(Globals.keyVaultUrl), new DefaultAzureCredential(), options);
+            KeyVaultSecret secret = client.GetSecret(Globals.secretNameClient);
+            var secretValue = secret.Value;
+
+            var confidentialClientApplication = ConfidentialClientApplicationBuilder
+            .Create(Globals.clientId)
+            .WithTenantId(Globals.tenantId)
+            .WithClientSecret(secretValue)
+            .Build();
+
+            var authResult = await confidentialClientApplication.AcquireTokenForClient(new[] { "https://graph.microsoft.com/.default" })
+                .ExecuteAsync();
+
+            return authResult.AccessToken;
         }
     }
 }
