@@ -216,9 +216,6 @@ namespace SiteReview
 
                 for (var i = 1; i < teamsActivityCSV.Count; i++)
                 {
-                    // Remove this
-                    Console.WriteLine(teamsActivityCSV[i][teamNameIndex]);
-
                     if (teamsActivityCSV[i][teamNameIndex] == siteDisplayName)
                     {
                         var teamLastActivityDate = teamsActivityCSV[i][lastActivityIndex];
