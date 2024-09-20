@@ -1,15 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SiteReview
 {
     public static class Globals
     {
+        // TODO: Add the expected classifications as an app setting once we know which classifications we want to enforce.
+        //       For now the app will flag anything without a classification.
+
+        public const string privateSetting = "Private";
         public static readonly string tenantId = GetEnvironmentString("tenantId");
         public static readonly string clientId = GetEnvironmentString("clientId");
         public static readonly string hubId = GetEnvironmentString("hubId");
         public static readonly string emailSenderId = GetEnvironmentString("emailSenderId");
-        public static readonly string adminEmail = GetEnvironmentString("adminEmail");
+        public static readonly string[] adminEmails = GetEnvironmentString("adminEmails").Split(',').Select(Email => Email.Trim()).ToArray();
 
         public static readonly string keyVaultUrl = GetEnvironmentString("keyVaultUrl");
         public static readonly string secretNameClient = GetEnvironmentString("secretNameClient");
@@ -22,6 +27,9 @@ namespace SiteReview
         public static readonly int inactiveDaysDelete = GetEnvironmentInt("inactiveDaysDelete", 0, 180);
         public static readonly int minSiteOwners = GetEnvironmentInt("minSiteOwners", 0);
         public static readonly double storageThreshold = GetEnvironmentDouble("storageThreshold", 0, 100);
+        public static readonly string expectedPrivacySetting = GetEnvironmentString("expectedPrivacySetting");
+
+        public static readonly bool reportOnlyMode = GetEnvironmentString("reportOnlyMode") != "0";
 
         public static List<string> GetExcludedSiteIds()
         {

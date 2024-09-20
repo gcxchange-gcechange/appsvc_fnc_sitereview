@@ -99,39 +99,41 @@ namespace SiteReview
                         // If the site is a subsite
                         if (subsiteIds.Any(s => s == siteId))
                         {
-                            var siteOwners = await GetSiteOwners(siteId, graphAPIAuth, log);
-
                             var site = await graphAPIAuth.Sites[siteId].Request().GetAsync();
+                            var siteDisplayName = site != null ? site.DisplayName : "Unknown";
                             siteURL = site != null ? site.WebUrl : $"Error: The WebUrl for SiteId {siteId} could not be found.";
+                            var privacySetting = "null";
+                            var classification = "None";
+
+                            var group = await GetGroupFromSite(site, graphAPIAuth, log);
+                            if (group != null)
+                            {
+                                privacySetting = group.Visibility;
+                                classification = group.Classification;
+                            }
+                            else
+                            {
+                                continue;
+                            }
 
                             var siteDaysInactive = (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays;
                             var teamDaysInactive = GetTeamsActivity(teamsActivityCSV, site.DisplayName, log);
+                            var siteOwners = await GetSiteOwners(site, graphAPIAuth, log);
 
+                            // Build report
                             var reportData = new ReportData(
                                 siteId, 
                                 siteURL, 
+                                siteDisplayName,
                                 (int)Math.Min(siteDaysInactive, teamDaysInactive), 
                                 siteOwners, 
                                 ulong.Parse(storageAllocated), 
-                                ulong.Parse(storageUsed)
+                                ulong.Parse(storageUsed),
+                                privacySetting,
+                                classification
                             );
 
-                            // If site and teams activity meets our threshold, add to the report.
-                            if (siteDaysInactive >= Globals.inactiveDaysDelete && teamDaysInactive >= Globals.inactiveDaysDelete)
-                            {
-                                siteReport.DeleteSites.Add(reportData);
-                            }
-                            else if (siteDaysInactive >= Globals.inactiveDaysWarn && teamDaysInactive >= Globals.inactiveDaysWarn)
-                            {
-                                siteReport.WarningSites.Add(reportData);
-                            }
-
-                            if (siteOwners.Count < Globals.minSiteOwners)
-                                siteReport.NoOwnerSites.Add(reportData);
-
-                            var usedPercentage = double.Parse(storageUsed) / double.Parse(storageAllocated) * 100;
-                            if (usedPercentage >= Globals.storageThreshold)
-                                siteReport.StorageThresholdSites.Add(reportData);
+                            siteReport.AddReportData(reportData);
                         }
                     }
                 }
@@ -145,66 +147,63 @@ namespace SiteReview
             }
         }
 
-        private static async Task<List<User>> GetSiteOwners(string siteId, GraphServiceClient graphAPIAuth, ILogger log)
+        private static async Task<Group> GetGroupFromSite(Site site, GraphServiceClient graphAPIAuth, ILogger log)
         {
-            var siteOwners = new List<User>();
-
             try
             {
-                var site = graphAPIAuth.Sites[siteId]
-                .Request()
-                .Header("ConsistencyLevel", "eventual")
-                .GetAsync()
-                .Result;
-
                 if (site != null)
                 {
-                    var groupQueryOptions = new List<QueryOption>()
-                    {
-                        new QueryOption("$search", "\"mailNickname:" + site.Name +"\"")
-                    };
-
                     var groups = await graphAPIAuth.Groups
-                    .Request(groupQueryOptions)
+                    .Request(new List<QueryOption>(){
+                    new QueryOption("$search", "\"mailNickname:" + site.Name + "\"")
+                    })
                     .Header("ConsistencyLevel", "eventual")
                     .GetAsync();
 
-                    do
+                    if (groups != null && groups.Count > 0)
                     {
-                        foreach (var group in groups)
+                        return groups[0];
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Something went wrong when attempting to find the group for a site with displayName: {site.DisplayName} - {e.Message}");
+            }
+
+            return null;
+        }
+
+        private static async Task<List<User>> GetSiteOwners(Site site, GraphServiceClient graphAPIAuth, ILogger log)
+        {
+            var siteOwners = new List<User>();
+            var group = await GetGroupFromSite(site, graphAPIAuth, log);
+
+            if (group != null)
+            {
+                var owners = await graphAPIAuth.Groups[group.Id].Owners
+                .Request()
+                .GetAsync();
+
+                do
+                {
+                    foreach (var owner in owners)
+                    {
+                        var user = await graphAPIAuth.Users[owner.Id]
+                        .Request()
+                        .Select("displayName,mail")
+                        .GetAsync();
+
+                        if (user != null)
                         {
-                            var owners = await graphAPIAuth.Groups[group.Id].Owners
-                            .Request()
-                            .GetAsync();
-
-                            do
-                            {
-                                foreach (var owner in owners)
-                                {
-                                    var user = await graphAPIAuth.Users[owner.Id]
-                                    .Request()
-                                    .Select("displayName,mail")
-                                    .GetAsync();
-
-                                    if (user != null)
-                                    {
-                                        siteOwners.Add(user);
-                                    }
-                                }
-                            }
-                            while (owners.NextPageRequest != null && (owners = await owners.NextPageRequest.GetAsync()).Count > 0);
+                            siteOwners.Add(user);
                         }
                     }
-                    while (groups.NextPageRequest != null && (groups = await groups.NextPageRequest.GetAsync()).Count > 0);
                 }
+                while (owners.NextPageRequest != null && (owners = await owners.NextPageRequest.GetAsync()).Count > 0);
+            }
 
-                return siteOwners;
-            }
-            catch (Exception ex)
-            {
-                log.LogError($"Error getting site owners for siteId {siteId} - {ex.Message}");
-                return siteOwners;
-            }
+            return siteOwners;
         }
 
         private static double GetTeamsActivity(List<List<string>> teamsActivityCSV, string siteDisplayName, ILogger log)
@@ -278,42 +277,6 @@ namespace SiteReview
             }
 
             return success;
-        }
-
-        public class SiteReport
-        {
-            public SiteReport()
-            {
-                WarningSites = new List<ReportData>();
-                DeleteSites = new List<ReportData>();
-                NoOwnerSites = new List<ReportData>();
-                StorageThresholdSites = new List<ReportData>();
-            }
-
-            public List<ReportData> WarningSites { get; set; }
-            public List<ReportData> DeleteSites { get; set; }
-            public List<ReportData> NoOwnerSites { get; set; }
-            public List<ReportData> StorageThresholdSites { get; set; }
-        }
-
-        public class ReportData
-        {
-            public ReportData(string siteId, string siteUrl, int inactiveDays, List<User> siteOwners, ulong storageCapacity, ulong storageUsed)
-            {
-                SiteId = siteId;
-                SiteUrl = siteUrl;
-                InactiveDays = inactiveDays;
-                SiteOwners = siteOwners;
-                StorageCapacity = storageCapacity;
-                StorageUsed = storageUsed;
-            }
-
-            public string SiteId { get; set; }
-            public string SiteUrl { get; set; }
-            public int InactiveDays { get; set; }
-            public List<User> SiteOwners { get; set; }
-            public ulong StorageCapacity { get; set; }
-            public ulong StorageUsed { get; set; }
         }
     }
 }
