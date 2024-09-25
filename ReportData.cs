@@ -5,7 +5,7 @@ namespace SiteReview
 {
     public class ReportData
     {
-        public ReportData(string siteId, string siteUrl, string siteDisplayName, int inactiveDays, List<User> siteOwners, ulong storageCapacity, ulong storageUsed, string privacySetting, string classification)
+        public ReportData(string siteId, string siteUrl, string siteDisplayName, int inactiveDays, List<User> siteOwners, ulong storageCapacity, ulong storageUsed, string privacySetting, string classification, bool inHub)
         {
             SiteId = siteId;
             SiteUrl = siteUrl;
@@ -16,6 +16,7 @@ namespace SiteReview
             StorageUsed = storageUsed;
             PrivacySetting = privacySetting;
             Classification = classification;
+            InHub = inHub;
         }
 
         public string SiteId { get; set; }
@@ -27,5 +28,6 @@ namespace SiteReview
         public ulong StorageUsed { get; set; }
         public string PrivacySetting { get; set; }
         public string Classification { get; set; }
+        public bool InHub { get; set; }
     }
 }

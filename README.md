@@ -6,17 +6,17 @@ Your app registration will need the following API permissions depending on if th
 - Reports.Read.All - Read all usage reports
 - Sites.Read.All - Read items in all site collections
 - Group.Read.All - Read all groups
-- Group.ReadWrite.All - Read and write all groups *(for report only mode OFF)*
+- Group.ReadWrite.All - Read and write all groups **(for report only mode OFF)**
 - User.Read.All - Read all users' full profiles
 - Mail.Send - Send mail as any user
 ### App Only
-- http://sharepoint/content/sitecollection - Full Control *(for report only mode OFF)*
-- http://sharepoint/content/tenant - Full Control *(for report only mode OFF)*
+- http://sharepoint/content/sitecollection - Full Control **(for report only mode OFF)**
+- http://sharepoint/content/tenant - Full Control **(for report only mode OFF)**
 ## How To Setup
-You will need to disable the option that conceals user, group, and site names in all reports. This can be done [in the admin panel](https://admin.microsoft.com/AdminPortal/Home#/Settings/Services/:/Settings/L1/Reports)
+You will need to disable the option that conceals user, group, and site names in all reports. This can be done [in the admin panel](https://admin.microsoft.com/AdminPortal/Home#/Settings/Services/:/Settings/L1/Reports)\
 The function app expects the following values:
 - **tenantId** - Your azure subscription
-- **hubId** - The site ID for the hub site. All subsites will be scanned.
+- **hubId** - The site ID for the hub site. All team sites in the tenant are expected to be a part of this hub (except the excludeSiteIds sites)
 - **clientId** - The app registration client ID
 - **appOnlyId** - The app only ID created in SharePoint
 - **appOnlySiteUrl** - The SharePoint site url where you set up the app-principal. (eg https://{your-tenant}-admin.sharepoint.com/)

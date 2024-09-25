@@ -12,6 +12,7 @@ namespace SiteReview
             StorageThresholdSites = new List<ReportData>();
             PrivacySettingSites = new List<ReportData>();
             ClassificationSites = new List<ReportData>();
+            HubAssociationSites = new List<ReportData>();
         }
 
         public List<ReportData> WarningSites { get; set; }
@@ -20,6 +21,7 @@ namespace SiteReview
         public List<ReportData> StorageThresholdSites { get; set; }
         public List<ReportData> PrivacySettingSites { get; set; }
         public List<ReportData> ClassificationSites { get; set; }
+        public List<ReportData> HubAssociationSites { get; set; }
 
         public void AddReportData(ReportData reportData)
         {
@@ -44,6 +46,9 @@ namespace SiteReview
 
             if (reportData.Classification == null)
                 ClassificationSites.Add(reportData);
+
+            if (!reportData.InHub)
+                HubAssociationSites.Add(reportData);
         }
     }
 }

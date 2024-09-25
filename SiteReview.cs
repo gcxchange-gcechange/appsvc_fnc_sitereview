@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.WebJobs.Extensions.Http;
+using System.Net.Http;
+using System.Net.Http.Headers;
 
 namespace SiteReview
 {
@@ -15,8 +17,8 @@ namespace SiteReview
     {
         [FunctionName("SiteReview")]
         public static async Task<IActionResult> Run(
-            //[TimerTrigger("0 0 0 1 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req, ILogger log, ExecutionContext executionContext)
+            [TimerTrigger("0 0 0 1 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+            //[HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReview executed at {DateTime.Now} with report only mode: {Globals.reportOnlyMode}");
 
@@ -28,10 +30,11 @@ namespace SiteReview
             log.LogInformation($"Found {report.StorageThresholdSites.Count} sites over {Globals.storageThreshold}% storage capacity.");
             log.LogInformation($"Found {report.WarningSites.Count + report.DeleteSites.Count} sites inactive for {Globals.inactiveDaysWarn} days or more.");
             log.LogInformation($"Found {report.DeleteSites.Count} sites inactive for {Globals.inactiveDaysDelete} days or more.");
-            log.LogInformation($"Found {report.PrivacySettingSites.Count} sites there we not set to private.");
-            log.LogInformation($"Found {report.ClassificationSites.Count} sites there had no classification.");
+            log.LogInformation($"Found {report.PrivacySettingSites.Count} sites that we not set to private.");
+            log.LogInformation($"Found {report.ClassificationSites.Count} sites that had no classification.");
+            log.LogInformation($"Found {report.HubAssociationSites.Count} sites that were not associated with the hub site {Globals.hubId}.");
 
-            var combinedReportSites = report.WarningSites
+            var uniqueListFlaggedSites = report.WarningSites
                 .Concat(report.DeleteSites)
                 .Concat(report.NoOwnerSites)
                 .Concat(report.StorageThresholdSites)
@@ -41,8 +44,8 @@ namespace SiteReview
                 .Select(site => site.First())
                 .ToList();
 
-            // Send the report to the admin email address
-            await Email.SendReportEmail(Globals.adminEmails, combinedReportSites, graphAPIAuth, log);
+            // Send the report to the admin email addresses
+            await Email.SendReportEmail(Globals.adminEmails, uniqueListFlaggedSites, graphAPIAuth, log);
 
             if (!Globals.reportOnlyMode)
             {

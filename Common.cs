@@ -57,86 +57,82 @@ namespace SiteReview
                     log.LogError($"Error retrieving teams usage report: {response.StatusCode}");
                 }
 
-                var excludeSiteIds = Globals.GetExcludedSiteIds();
-                var subsiteIds = new List<string>();
+                 var allSites = await graphAPIAuth.Sites
+                .Request()
+                .Header("ConsistencyLevel", "eventual")
+                .GetAsync();
 
-                // Get subsites
+                log.LogInformation($"Found {allSites.Count} sites in your tenant.");
+
+                // Get sites in our hub
                 var sitesQueryOptions = new List<QueryOption>()
                 {
                     new QueryOption("search", "DepartmentId:{" + Globals.hubId + "}"),
                 };
 
-                var subsites = await graphAPIAuth.Sites
+                var hubSites = await graphAPIAuth.Sites
                 .Request(sitesQueryOptions)
                 .Header("ConsistencyLevel", "eventual")
                 .GetAsync();
 
+                log.LogInformation($"Found {hubSites.Count} sites in the {Globals.hubId} hub.");
+                log.LogInformation($"Beginning to build your report...");
+
+                var excludeSiteIds = Globals.GetExcludedSiteIds();
+
                 do
                 {
-                    foreach (var site in subsites)
+                    foreach (var site in allSites)
                     {
-                        subsiteIds.Add(site.Id.Split(",")[1]);
-                    }
-                }
-                while (subsites.NextPageRequest != null && (subsites = await subsites.NextPageRequest.GetAsync()).Count > 0);
-
-                // Build the report
-                for (var i = 1; i < siteCSV.Count; i++)
-                {
-                    var siteId = siteCSV[i][siteSiteIdIndex];
-                    var lastActivityDate = siteCSV[i][siteLastActivityIndex];
-                    var siteURL = siteCSV[i][siteSiteURLIndex];
-                    var storageUsed = siteCSV[i][siteStorageUsedIndex];
-                    var storageAllocated = siteCSV[i][siteStorageAllocatedIndex];
-
-                    // TODO: Do we care if there's no last activity date??
-                    if (lastActivityDate != string.Empty)
-                    {
-                        // Skip excluded sites
-                        if (excludeSiteIds.Contains(siteId))
-                            continue;
-
-                        // If the site is a subsite
-                        if (subsiteIds.Any(s => s == siteId))
+                        if (excludeSiteIds.Contains(site.Id))
                         {
-                            var site = await graphAPIAuth.Sites[siteId].Request().GetAsync();
-                            var siteDisplayName = site != null ? site.DisplayName : "Unknown";
-                            siteURL = site != null ? site.WebUrl : $"Error: The WebUrl for SiteId {siteId} could not be found.";
-                            var privacySetting = "null";
-                            var classification = "None";
+                            log.LogInformation($"Skipped {site.DisplayName} - Excluded site.");
+                            continue;
+                        }
 
-                            var group = await GetGroupFromSite(site, graphAPIAuth, log);
-                            if (group != null)
+                        var group = await GetGroupFromSite(site, graphAPIAuth, log);
+
+                        if (group != null)
+                        {
+                            log.LogInformation($"Checking {site.DisplayName} ...");
+
+                            // Build the report
+                            for (var i = 1; i < siteCSV.Count; i++)
                             {
-                                privacySetting = group.Visibility;
-                                classification = group.Classification;
+                                var siteId = siteCSV[i][siteSiteIdIndex];
+                                var lastActivityDate = siteCSV[i][siteLastActivityIndex];
+                                var siteURL = siteCSV[i][siteSiteURLIndex];
+                                var storageUsed = siteCSV[i][siteStorageUsedIndex];
+                                var storageAllocated = siteCSV[i][siteStorageAllocatedIndex];
+
+                                if (site.Id.Split(",")[1] == siteId)
+                                {
+                                    var siteDaysInactive = lastActivityDate != String.Empty ? (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays : Globals.inactiveDaysDelete;
+                                    var teamDaysInactive = GetTeamsActivity(teamsActivityCSV, site.DisplayName, log);
+                                    var siteOwners = await GetSiteOwners(site, graphAPIAuth, log);
+                                    var privacySetting = group.Visibility ?? null;
+                                    var classification = group.Classification ?? null;
+
+                                    var reportData = new ReportData(
+                                        siteId,
+                                        site.WebUrl,
+                                        site.DisplayName,
+                                        (int)Math.Min(siteDaysInactive, teamDaysInactive),
+                                        siteOwners,
+                                        ulong.Parse(storageAllocated),
+                                        ulong.Parse(storageUsed),
+                                        privacySetting,
+                                        classification,
+                                        SiteExists(hubSites, site)
+                                    );
+
+                                    siteReport.AddReportData(reportData);
+                                }
                             }
-                            else
-                            {
-                                continue;
-                            }
-
-                            var siteDaysInactive = (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays;
-                            var teamDaysInactive = GetTeamsActivity(teamsActivityCSV, site.DisplayName, log);
-                            var siteOwners = await GetSiteOwners(site, graphAPIAuth, log);
-
-                            // Build report
-                            var reportData = new ReportData(
-                                siteId, 
-                                siteURL, 
-                                siteDisplayName,
-                                (int)Math.Min(siteDaysInactive, teamDaysInactive), 
-                                siteOwners, 
-                                ulong.Parse(storageAllocated), 
-                                ulong.Parse(storageUsed),
-                                privacySetting,
-                                classification
-                            );
-
-                            siteReport.AddReportData(reportData);
                         }
                     }
                 }
+                while (allSites.NextPageRequest != null && (allSites = await allSites.NextPageRequest.GetAsync()).Count > 0);
 
                 return siteReport;
             }
@@ -147,15 +143,40 @@ namespace SiteReview
             }
         }
 
-        private static async Task<Group> GetGroupFromSite(Site site, GraphServiceClient graphAPIAuth, ILogger log)
+        public static bool SiteExists(IGraphServiceSitesCollectionPage sitePage, Site targetSite)
+        {
+            var currentPage = sitePage;
+
+            while (currentPage != null)
+            {
+                if (currentPage.Contains(targetSite))
+                    return true;
+
+                
+                if (currentPage.NextPageRequest != null)
+                    currentPage = currentPage.NextPageRequest.GetAsync().Result;
+                else
+                    break;
+            }
+
+            return false;
+        }
+
+        public static async Task<Group> GetGroupFromSite(Site site, GraphServiceClient graphAPIAuth, ILogger log)
         {
             try
             {
                 if (site != null)
                 {
+                    if (site.Name == null || site.Name == String.Empty)
+                    {
+                        log.LogWarning($"{site.DisplayName} will be skipped because we can't tell if it's a team or comms site.");
+                        return null;
+                    }
+
                     var groups = await graphAPIAuth.Groups
                     .Request(new List<QueryOption>(){
-                    new QueryOption("$search", "\"mailNickname:" + site.Name + "\"")
+                    new QueryOption("$search", "\"mailNickname:" + Uri.EscapeDataString(site.Name) + "\"")
                     })
                     .Header("ConsistencyLevel", "eventual")
                     .GetAsync();
@@ -168,7 +189,7 @@ namespace SiteReview
             }
             catch (Exception e)
             {
-                log.LogError($"Something went wrong when attempting to find the group for a site with displayName: {site.DisplayName} - {e.Message}");
+                log.LogError($"Something went wrong when attempting to find the group for a site with name: {site.Name} - {e.Message}");
             }
 
             return null;
@@ -218,11 +239,14 @@ namespace SiteReview
                     if (teamsActivityCSV[i][teamNameIndex] == siteDisplayName)
                     {
                         var teamLastActivityDate = teamsActivityCSV[i][lastActivityIndex];
-                        return (DateTime.Now - DateTime.Parse(teamLastActivityDate)).TotalDays;
+                        if (teamLastActivityDate != String.Empty)
+                            return (DateTime.Now - DateTime.Parse(teamLastActivityDate)).TotalDays;
+                        else
+                            break;
                     }
                 }
 
-                log.LogWarning($"Unable to find team activity for {siteDisplayName}");
+                log.LogWarning($"Unable to find team activity for {siteDisplayName}. Set inactive team days to {Globals.inactiveDaysDelete}");
                 return Globals.inactiveDaysDelete;
             }
             catch (Exception e)
