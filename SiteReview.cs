@@ -34,18 +34,8 @@ namespace SiteReview
             log.LogInformation($"Found {report.ClassificationSites.Count} sites that had no classification.");
             log.LogInformation($"Found {report.HubAssociationSites.Count} sites that were not associated with the hub site {Globals.hubId}.");
 
-            var uniqueListFlaggedSites = report.WarningSites
-                .Concat(report.DeleteSites)
-                .Concat(report.NoOwnerSites)
-                .Concat(report.StorageThresholdSites)
-                .Concat(report.PrivacySettingSites)
-                .Concat(report.ClassificationSites)
-                .GroupBy(site => site.SiteId)
-                .Select(site => site.First())
-                .ToList();
-
             // Send the report to the admin email addresses
-            await Email.SendReportEmail(Globals.adminEmails, uniqueListFlaggedSites, graphAPIAuth, log);
+            await Email.SendReportEmail(Globals.adminEmails, report.GetUniqueListSites(), graphAPIAuth, log);
 
             if (!Globals.reportOnlyMode)
             {

@@ -1,5 +1,20 @@
 ##  Site Review Function App
-This function app looks for sites that are inactive for more than 60 days or more than 120 days. Owners of the site or team will be informed after 60 days that their site has been flagged for deletion. After 120 days those sites will be deleted and the owners will be informed. This function app runs on a monthly timer. There are two functions, one informs owners, deletes the site teams, and stores the site ids in blob storage. The second function runs 24 hours later and deletes the sites using the ids in blob storage. The delay between the two is so there is enough time that the team is no long associated with the site and we can successfully remove the site.
+This Function App is designed to automate the monitoring and reporting of SharePoint Framework (SPFx) Teams sites across a Microsoft 365 tenant. It scans all Teams sites and generates a comprehensive report based on several criteria, such as site ownership, storage usage, activity levels, classification settings, hub association, and privacy configurations. The app aims to ensure that sites adhere to organizational policies and standards, with built-in functionality for sending alerts and automated actions when needed.
+## Features
+ - **Site Owners Check**: Identifies Teams sites that have fewer than a specified number of site owners.
+  -   **Storage Utilization Monitoring**: Flags sites that exceed a defined percentage of their allocated storage.
+-   **Activity Monitoring**:
+    -   Warns when a site has been inactive for a specified number of days.
+    -   Flags sites for deletion if inactivity exceeds a different, specified threshold.
+-   **Classification Verification**: Checks if a site has a classification setting, and flags sites without one.
+-   **Privacy Setting Validation**: Ensures that sites have the correct privacy settings based on organizational policies.
+-   **Hub Association Validation**: Checks that the sites are children of a specified hub site, and flags those who are not.
+-   **Automated Reporting and Notification**:
+    -   Generates a report summarizing all flagged issues and emails it to a specified list of recipients.
+    -   Supports "report only" mode, where no actions are taken other than sending the report.
+    -   In non-report-only mode, the app sends email notifications to all site owners when a site is flagged for a warning.
+    -   Automatically deletes flagged sites and associated site groups when they meet the deletion criteria.
+-  **Excluded Sites**: Specific sites can be ignored from the report by providing a list of Site Ids in the app settings.
 ##  API Permissions
 Your app registration will need the following API permissions depending on if the app is running in report only mode or not.
 ### Microsoft Graph
