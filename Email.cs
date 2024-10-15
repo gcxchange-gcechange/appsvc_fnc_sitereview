@@ -1,9 +1,11 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
+using Microsoft.Identity.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using static SiteReview.Auth;
 using static SiteReview.Common;
 
 namespace SiteReview
@@ -140,6 +142,18 @@ namespace SiteReview
 
             try
             {
+                var scopes = new[] { "mail.send" };
+                ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
+                var graphClient = new GraphServiceClient(auth, scopes);
+
+
+
+
+
+
+
+
+
                 var message = new Message
                 {
                     Subject = emailSubject,
@@ -160,7 +174,7 @@ namespace SiteReview
                     }
                 };
 
-                await graphAPIAuth.Users[Globals.emailSenderId]
+                await graphClient.Users[Globals.emailSenderId]
                 .SendMail(message, null)
                 .Request()
                 .PostAsync();

@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using static SiteReview.Auth;
 
 namespace SiteReview
 {
@@ -17,8 +18,8 @@ namespace SiteReview
     {
         [FunctionName("SiteReview")]
         public static async Task<IActionResult> Run(
-            [TimerTrigger("0 0 0 1 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
-            //[HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req, ILogger log, ExecutionContext executionContext)
+            //[TimerTrigger("0 0 0 1 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReview executed at {DateTime.Now} with report only mode: {Globals.reportOnlyMode}");
 
@@ -34,8 +35,15 @@ namespace SiteReview
             log.LogInformation($"Found {report.ClassificationSites.Count} sites that had no classification.");
             log.LogInformation($"Found {report.HubAssociationSites.Count} sites that were not associated with the hub site {Globals.hubId}.");
 
-            // Send the report to the admin email addresses
-            await Email.SendReportEmail(Globals.adminEmails, report.GetUniqueListSites(), graphAPIAuth, log);
+            var uniqueListSites = report.GetUniqueListSites();
+            if (true /*uniqueListSites.Count > 0*/)
+            {
+                var scopes = new[] { "user.read mail.send" };
+                ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
+                var graphClient = new GraphServiceClient(auth, scopes);
+
+                await Email.SendReportEmail(Globals.adminEmails, uniqueListSites, graphClient, log);
+            }
 
             if (!Globals.reportOnlyMode)
             {
