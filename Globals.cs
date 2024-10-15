@@ -13,8 +13,8 @@ namespace SiteReview
         public static readonly string tenantId = GetEnvironmentString("tenantId");
         public static readonly string clientId = GetEnvironmentString("clientId");
         public static readonly string hubId = GetEnvironmentString("hubId");
-        public static readonly string emailSenderId = GetEnvironmentString("emailSenderId");
         public static readonly string[] adminEmails = GetEnvironmentString("adminEmails").Split(',').Select(Email => Email.Trim()).ToArray();
+        public static readonly string emailUserName = GetEnvironmentString("emailUserName");
 
         public static readonly string keyVaultUrl = GetEnvironmentString("keyVaultUrl");
         public static readonly string secretNameClient = GetEnvironmentString("secretNameClient");
