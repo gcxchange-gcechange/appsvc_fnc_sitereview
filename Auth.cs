@@ -143,13 +143,13 @@ namespace SiteReview
                 };
 
                 var client = new SecretClient(new System.Uri(config["keyVaultUrl"]), new DefaultAzureCredential(), options);
-                KeyVaultSecret secret_client = client.GetSecret(config["secretNameEmail"]);
+                KeyVaultSecret secret_client = client.GetSecret(config["secretNameClient"]);
                 var clientSecret = secret_client.Value;
                 KeyVaultSecret secret_password = client.GetSecret(config["secretNameEmailPassword"]);
                 var password = secret_password.Value;
 
                 // Public Constructor
-                _username = config["delegated_username"];
+                _username = config["emailUserName"];
                 _password = password;
                 _tenantId = config["tenantId"];
                 _clientId = config["clientId"];

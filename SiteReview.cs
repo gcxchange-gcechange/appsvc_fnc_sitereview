@@ -36,7 +36,7 @@ namespace SiteReview
             log.LogInformation($"Found {report.HubAssociationSites.Count} sites that were not associated with the hub site {Globals.hubId}.");
 
             var uniqueListSites = report.GetUniqueListSites();
-            if (true /*uniqueListSites.Count > 0*/)
+            if (uniqueListSites.Count > 0)
             {
                 var scopes = new[] { "user.read mail.send" };
                 ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);

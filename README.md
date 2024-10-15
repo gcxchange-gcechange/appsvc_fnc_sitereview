@@ -38,8 +38,9 @@ The function app expects the following values:
 - **keyVaultUrl** - The URL to the key vault containing the client and app only secrets.
 - **secretNameClient** - The name of the client secret in your key vault
 - **secretNameAppOnly** - The name of the app only secret in your key vault
+- **secretNameEmailPassword** - The name of the secret in your key vault that contains the password for the delegated user who is sending the email.
+- **emailUserName** - The username of the delegated user who is sending the email.
 - **excludeSiteIds** - A string of site IDs seperated by commas. These sites will be ignored.
-- **emailSenderId** - The object ID of the user that will send emails. Make sure this user has a license to send email
 - **adminEmails** - The admin email addresses where the reports will be sent. Each email should be seperated by a comma.
 - **inactiveDaysWarn** - The number of days of inactivity for a site to receive a warning (min 0).
 - **inactiveDaysDelete** - The number of days of inactivity for a site to be deleted (min 0).

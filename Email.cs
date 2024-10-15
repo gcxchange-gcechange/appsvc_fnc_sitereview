@@ -142,18 +142,6 @@ namespace SiteReview
 
             try
             {
-                var scopes = new[] { "mail.send" };
-                ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
-                var graphClient = new GraphServiceClient(auth, scopes);
-
-
-
-
-
-
-
-
-
                 var message = new Message
                 {
                     Subject = emailSubject,
@@ -174,7 +162,7 @@ namespace SiteReview
                     }
                 };
 
-                await graphClient.Users[Globals.emailSenderId]
+                await graphAPIAuth.Users[Globals.emailUserName]
                 .SendMail(message, null)
                 .Request()
                 .PostAsync();
