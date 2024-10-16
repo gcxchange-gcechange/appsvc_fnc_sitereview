@@ -15,24 +15,26 @@ namespace SiteReview
         {
             log.LogInformation($"DeleteSites executed at {DateTime.Now}");
 
-            var auth = new Auth();
-            var graphAPIAuth = auth.graphAuth(log);
-
-            var siteIds = await StoreData.GetSitesToDelete(executionContext, Common.DeleteSiteIdsContainerName, log);
-
-            log.LogInformation($"Found {siteIds.Count} sites to be deleted");
-
-            foreach (var id in siteIds)
+            if (!Globals.reportOnlyMode)
             {
-                var site = graphAPIAuth.Sites[id]
-                .Request()
-                .Header("ConsistencyLevel", "eventual")
-                .GetAsync()
-                .Result;
-                
-                if (site != null)
+                var graphAPIAuth = new Auth().graphAuth(log);
+
+                var siteIds = await StoreData.GetSitesToDelete(executionContext, Common.DeleteSiteIdsContainerName, log);
+
+                log.LogInformation($"Found {siteIds.Count} sites to be deleted");
+
+                foreach (var id in siteIds)
                 {
-                    await Common.DeleteSite(site.WebUrl, log);
+                    var site = graphAPIAuth.Sites[id]
+                    .Request()
+                    .Header("ConsistencyLevel", "eventual")
+                    .GetAsync()
+                    .Result;
+
+                    if (site != null)
+                    {
+                        await Common.DeleteSite(site.WebUrl, log);
+                    }
                 }
             }
 
