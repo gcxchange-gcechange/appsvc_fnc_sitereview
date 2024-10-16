@@ -174,17 +174,29 @@ namespace SiteReview
                         return null;
                     }
 
+                    var escapedSiteName = site.Name.Replace(",", "%2C").Replace("&", "%26").Replace("(", "%28").Replace(")", "%29").Replace("é", "%C3%A9").Replace("É", "%C3%89").Replace(" ", "%20").Replace("'", "''");
+
                     var groups = await graphAPIAuth.Groups
                     .Request(new List<QueryOption>(){
-                    new QueryOption("$search", "\"mailNickname:" + Uri.EscapeDataString(site.Name) + "\"")
+                        new QueryOption("$search", "\"mailNickname:" + escapedSiteName + "\"")
                     })
                     .Header("ConsistencyLevel", "eventual")
                     .GetAsync();
 
                     if (groups != null && groups.Count > 0)
                     {
-                        return groups[0];
+                        if (groups[0] != null)
+                            return groups[0];
                     }
+
+                    groups = await graphAPIAuth.Groups
+                    .Request()
+                    .Filter($"displayName eq '{escapedSiteName}'")
+                    .Header("ConsistencyLevel", "eventual")
+                    .GetAsync();
+
+                    if (groups != null && groups.Count > 0)
+                        return groups[0];
                 }
             }
             catch (Exception e)
