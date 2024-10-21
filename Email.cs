@@ -1,14 +1,52 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
+using Microsoft.Identity.Client;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using static SiteReview.Auth;
+using static SiteReview.Common;
 
 namespace SiteReview
 {
     public static class Email
     {
-        public static async Task<bool> SendWarningEmail(string userEmail, string siteUrl, ILogger log)
+        public static async Task<bool> SendReportEmail(string[] userEmails, List<ReportData> reportData, GraphServiceClient graphAPIAuth, ILogger log)
+        {
+            List<Task> emailTasks = new List<Task>();
+            foreach (var email in userEmails)
+            {
+                emailTasks.Add(SendEmail(
+                    email,
+                    $"Site Review Report",
+                    $"Greetings,<br><br>We found {reportData.Count + (reportData.Count == 1 ? $" site" : " sites")} flagged for review.<br>Please note that <b>bolded text</b> indicates a violation of our policies.<br><br><ol>" +
+                    string.Join(
+                        "<hr>",
+                        reportData.Select(item =>
+                            "<li>" +
+                            $"Site: <a href='{item.SiteUrl}' target='_blank'>{item.SiteDisplayName}</a><br>" +
+                            $"In Hub: {(item.InHub == false ? "<b>" + item.InHub + "</b>" : item.InHub)}<br>" +
+                            $"Classification: {(item.Classification == null ? "<b>None</b>" : item.Classification)}<br>" +
+                            $"Privacy: {(item.PrivacySetting != "Private" ? "<b>" + (item.PrivacySetting != null ? item.PrivacySetting : "null") + "</b>" : item.PrivacySetting)}<br>" +
+                            $"Owners: {(item.SiteOwners.Count < Globals.minSiteOwners ? "<b>" + item.SiteOwners.Count + "</b>" : item.SiteOwners.Count)}<br>" +
+                            $"Inactive: {(item.InactiveDays >= Globals.inactiveDaysWarn ? "<b>" + item.InactiveDays + " days</b>" : item.InactiveDays + " days") }<br>" +
+                            $"Storage Used: {(item.StorageUsed / item.StorageCapacity * 100 >= Globals.storageThreshold ? "<b>" + (item.StorageUsed / item.StorageCapacity * 100).ToString("F2") + "%</b>" : (item.StorageUsed / item.StorageCapacity * 100).ToString("F2") + "%")}<br>" +
+                            $"Owner Emails: {(item.SiteOwners.Any() ? string.Join(", ", item.SiteOwners.Select(m => m.Mail)) : "<b>None</b>")}" +
+                            "</li>"
+                        )
+                    ) +
+                    "</ol><br><br>Regards,<br>The GCX Team",
+                    BodyType.Html,
+                    graphAPIAuth,
+                    log
+                ));
+            }
+
+            await Task.WhenAll(emailTasks);
+            return true;
+        }
+        public static async Task<bool> SendWarningEmail(string userEmail, string siteUrl, GraphServiceClient graphAPIAuth, ILogger log)
         {
             return await SendEmail(
                 userEmail,
@@ -46,12 +84,14 @@ namespace SiteReview
                 Veuillez nous indiquer si vous avez des questions ou des préoccupations et, une fois de plus, nous vous remercions d’être un membre important de GCÉchange. 
 
                 Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
-                Équipe de GCÉchange", 
+                Équipe de GCÉchange",
+                BodyType.Text,
+                graphAPIAuth,
                 log
             );
         }
 
-        public static async Task<bool> SendDeleteEmail(string userEmail, string siteUrl, ILogger log)
+        public static async Task<bool> SendDeleteEmail(string userEmail, string siteUrl, GraphServiceClient graphAPIAuth, ILogger log)
         {
             return await SendEmail(
                 userEmail,
@@ -89,16 +129,16 @@ namespace SiteReview
                 Veuillez nous indiquer si vous avez des questions ou des préoccupations et, une fois de plus, nous vous remercions d’être un membre important de GCÉchange.
                  
                 Nous vous prions d’agréer l’expression de nos sentiments les meilleurs. 
-                Équipe de GCÉchange", 
+                Équipe de GCÉchange",
+                BodyType.Text,
+                graphAPIAuth,
                 log
             );
         }
 
-        private static async Task<bool> SendEmail(string userEmail, string emailSubject, string emailBody, ILogger log)
+        private static async Task<bool> SendEmail(string userEmail, string emailSubject, string emailBody, BodyType bodyType, GraphServiceClient graphAPIAuth, ILogger log)
         {
             var res = true;
-            var auth = new Auth();
-            var graphAPIAuth = auth.graphAuth(log);
 
             try
             {
@@ -107,7 +147,7 @@ namespace SiteReview
                     Subject = emailSubject,
                     Body = new ItemBody
                     {
-                        ContentType = BodyType.Text,
+                        ContentType = bodyType,
                         Content = emailBody
                     },
                     ToRecipients = new List<Recipient>()
@@ -122,7 +162,7 @@ namespace SiteReview
                     }
                 };
 
-                await graphAPIAuth.Users[Globals.emailSenderId]
+                await graphAPIAuth.Users[Globals.emailUserName]
                 .SendMail(message, null)
                 .Request()
                 .PostAsync();
