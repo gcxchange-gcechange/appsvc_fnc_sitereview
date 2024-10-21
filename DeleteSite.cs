@@ -10,7 +10,7 @@ namespace SiteReview
     internal class DeleteSite
     {
         [FunctionName("DeleteSites")]
-        public static async Task<IActionResult> Run(
+        public static async Task Run(
             [TimerTrigger("0 0 0 2 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"DeleteSites executed at {DateTime.Now}");
@@ -38,7 +38,7 @@ namespace SiteReview
                 }
             }
 
-            return new OkObjectResult("Function app executed successfully");
+            log.LogInformation("Function app executed successfully");
         }
     }
 }
