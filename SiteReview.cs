@@ -17,14 +17,13 @@ namespace SiteReview
     public static class SiteReview
     {
         [FunctionName("SiteReview")]
-        public static async Task Run(
-            [TimerTrigger("0 0 0 * * 6")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
-            //[HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req, ILogger log, ExecutionContext executionContext)
+        public static async Task<IActionResult> Run(
+            //[TimerTrigger("0 0 0 * * 6")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReview executed at {DateTime.Now} with report only mode: {Globals.reportOnlyMode}");
 
             var graphAPIAuth = new Auth().graphAuth(log);
-
             var report = await Common.GetReport(graphAPIAuth, log);
 
             log.LogInformation($"Found {report.NoOwnerSites.Count} sites with less than {Globals.minSiteOwners} owners.");
@@ -92,7 +91,8 @@ namespace SiteReview
                 await StoreData.StoreSitesToDelete(executionContext, deleteSiteIds, Common.DeleteSiteIdsContainerName, log);
             }
 
-            log.LogInformation("Function app executed successfully");
+            return new OkObjectResult("Function app executed successfully");
+            //log.LogInformation("Function app executed successfully");
         }
     }
 }

@@ -32,6 +32,8 @@ namespace SiteReview
                 var siteReportResponse = await graphAPIAuth.HttpProvider.SendAsync(siteReportMsg);
                 var siteCSV = Helpers.GenerateCSV(await siteReportResponse.Content.ReadAsStringAsync());
 
+                log.LogInformation($"Site usage report contains data on {siteCSV.Count - 1} sites in total.");
+
                 // Look at the site CSV header for the index of data we care about
                 var siteSiteIdIndex = siteCSV.FirstOrDefault().FindIndex(l => l.Equals("Site Id"));
                 var siteLastActivityIndex = siteCSV.FirstOrDefault().FindIndex(l => l.Equals("Last Activity Date"));
@@ -49,8 +51,9 @@ namespace SiteReview
                 var teamsActivityCSV = new List<List<string>>();
                 if (response.IsSuccessStatusCode)
                 {
-                    log.LogInformation("Got teams usage report.");
                     teamsActivityCSV = Helpers.GenerateCSV(await response.Content.ReadAsStringAsync());
+                    log.LogInformation("Got teams usage report.");
+                    log.LogInformation($"Teams usage report contains data on {teamsActivityCSV.Count - 1} teams in total.");
                 }
                 else
                 {
@@ -61,8 +64,6 @@ namespace SiteReview
                 .Request()
                 .Header("ConsistencyLevel", "eventual")
                 .GetAsync();
-
-                log.LogInformation($"Found {allSites.Count} sites in your tenant.");
 
                 // Get sites in our hub
                 var sitesQueryOptions = new List<QueryOption>()
@@ -75,18 +76,21 @@ namespace SiteReview
                 .Header("ConsistencyLevel", "eventual")
                 .GetAsync();
 
-                log.LogInformation($"Found {hubSites.Count} sites in the {Globals.hubId} hub.");
                 log.LogInformation($"Beginning to build your report...");
 
                 var excludeSiteIds = Globals.GetExcludedSiteIds();
 
+                var sitePage = 1;
+                var totalSites = 0;
                 do
                 {
+                    log.LogInformation($"{Environment.NewLine}Checking site page {sitePage} containing {allSites.Count} sites...{Environment.NewLine}");
+
                     foreach (var site in allSites)
                     {
                         if (excludeSiteIds.Contains(site.Id))
                         {
-                            log.LogInformation($"Skipped {site.DisplayName} - Excluded site.");
+                            log.LogInformation($"Skipped excluded site: {site.DisplayName}");
                             continue;
                         }
 
@@ -104,14 +108,22 @@ namespace SiteReview
                                 var siteURL = siteCSV[i][siteSiteURLIndex];
                                 var storageUsed = siteCSV[i][siteStorageUsedIndex];
                                 var storageAllocated = siteCSV[i][siteStorageAllocatedIndex];
+                                var foundSite = site.Id.Split(",")[1] == siteId;
 
-                                if (site.Id.Split(",")[1] == siteId)
+                                if (foundSite || i == siteCSV.Count - 1)
                                 {
-                                    var siteDaysInactive = lastActivityDate != String.Empty ? (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays : Globals.inactiveDaysDelete;
+                                    double siteDaysInactive;
+
+                                    if (!foundSite)
+                                    {
+                                        log.LogInformation($"Couldn't find {site.DisplayName} in the site usage report. Set inactive site days to {Globals.inactiveDaysDelete}.");
+                                        siteDaysInactive = Globals.inactiveDaysDelete;
+                                    }
+
+                                    siteDaysInactive = lastActivityDate != String.Empty ? (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays : Globals.inactiveDaysDelete;
                                     var teamDaysInactive = GetTeamsActivity(teamsActivityCSV, site.DisplayName, log);
                                     var siteOwners = await GetSiteOwners(site, graphAPIAuth, log);
                                     var privacySetting = group.Visibility ?? null;
-                                    var classification = group.Classification ?? null;
 
                                     var reportData = new ReportData(
                                         siteId,
@@ -122,17 +134,27 @@ namespace SiteReview
                                         ulong.Parse(storageAllocated),
                                         ulong.Parse(storageUsed),
                                         privacySetting,
-                                        classification,
+                                        group.AssignedLabels,
                                         SiteExists(hubSites, site)
                                     );
 
                                     siteReport.AddReportData(reportData);
+                                    break;
                                 }
                             }
                         }
+                        else
+                        {
+                            log.LogWarning($"Couldn't find a group for {site.DisplayName} so it will not be included in the report.");
+                        }
                     }
+
+                    sitePage++;
+                    totalSites += allSites.Count;
                 }
                 while (allSites.NextPageRequest != null && (allSites = await allSites.NextPageRequest.GetAsync()).Count > 0);
+
+                log.LogInformation($"{Environment.NewLine}{totalSites} sites were scanned in total.{Environment.NewLine}");
 
                 return siteReport;
             }
@@ -181,6 +203,7 @@ namespace SiteReview
                         new QueryOption("$search", "\"mailNickname:" + escapedSiteName + "\"")
                     })
                     .Header("ConsistencyLevel", "eventual")
+                    .Select("id,displayName,mail,mailNickname,groupTypes,visibility,classification,assignedLicenses,assignedLabels")
                     .GetAsync();
 
                     if (groups != null && groups.Count > 0)
@@ -193,6 +216,7 @@ namespace SiteReview
                     .Request()
                     .Filter($"displayName eq '{escapedSiteName}'")
                     .Header("ConsistencyLevel", "eventual")
+                    .Select("id,displayName,mail,mailNickname,groupTypes,visibility,classification,assignedLicenses,assignedLabels")
                     .GetAsync();
 
                     if (groups != null && groups.Count > 0)
@@ -258,7 +282,7 @@ namespace SiteReview
                     }
                 }
 
-                log.LogWarning($"Unable to find team activity for {siteDisplayName}. Set inactive team days to {Globals.inactiveDaysDelete}");
+                log.LogWarning($"Unable to find team activity for {siteDisplayName}. Set inactive team days to {Globals.inactiveDaysDelete}.");
                 return Globals.inactiveDaysDelete;
             }
             catch (Exception e)

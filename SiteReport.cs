@@ -41,7 +41,7 @@ namespace SiteReview
             if (reportData.PrivacySetting != Globals.expectedPrivacySetting)
                 PrivacySettingSites.Add(reportData);
 
-            if (reportData.Classification == null)
+            if (!reportData.AssignedLabels.Any())
                 ClassificationSites.Add(reportData);
 
             if (!reportData.InHub)

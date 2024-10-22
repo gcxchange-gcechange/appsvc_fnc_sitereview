@@ -27,7 +27,7 @@ namespace SiteReview
                             "<li>" +
                             $"Site: <a href='{item.SiteUrl}' target='_blank'>{item.SiteDisplayName}</a><br>" +
                             $"In Hub: {(item.InHub == false ? "<b>" + item.InHub + "</b>" : item.InHub)}<br>" +
-                            $"Classification: {(item.Classification == null ? "<b>None</b>" : item.Classification)}<br>" +
+                            $"Classification: {(item.AssignedLabels.Any() == false ? "<b>None</b>" : string.Join(", ", item.AssignedLabels.Select(m => m.DisplayName)))}<br>" +
                             $"Privacy: {(item.PrivacySetting != "Private" ? "<b>" + (item.PrivacySetting != null ? item.PrivacySetting : "null") + "</b>" : item.PrivacySetting)}<br>" +
                             $"Owners: {(item.SiteOwners.Count < Globals.minSiteOwners ? "<b>" + item.SiteOwners.Count + "</b>" : item.SiteOwners.Count)}<br>" +
                             $"Inactive: {(item.InactiveDays >= Globals.inactiveDaysWarn ? "<b>" + item.InactiveDays + " days</b>" : item.InactiveDays + " days") }<br>" +
