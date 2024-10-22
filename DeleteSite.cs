@@ -33,7 +33,7 @@ namespace SiteReview
 
                     if (site != null)
                     {
-                        await Common.DeleteSite(site.WebUrl, log);
+                        Common.DeleteSite(site.WebUrl, log);
                     }
                 }
             }

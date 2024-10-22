@@ -71,10 +71,17 @@ namespace SiteReview
                     new QueryOption("search", "DepartmentId:{" + Globals.hubId + "}"),
                 };
 
-                var hubSites = await graphAPIAuth.Sites
+                var hubSitesPage = await graphAPIAuth.Sites
                 .Request(sitesQueryOptions)
                 .Header("ConsistencyLevel", "eventual")
                 .GetAsync();
+
+                var hubSites = new List<Site>();
+                do
+                {
+                    hubSites.AddRange(hubSitesPage);
+
+                } while (hubSitesPage.NextPageRequest != null && (hubSitesPage = await hubSitesPage.NextPageRequest.GetAsync()).Count > 0);
 
                 log.LogInformation($"Beginning to build your report...");
 
@@ -116,7 +123,7 @@ namespace SiteReview
 
                                     if (!foundSite)
                                     {
-                                        log.LogInformation($"Couldn't find {site.DisplayName} in the site usage report. Set inactive site days to {Globals.inactiveDaysDelete}.");
+                                        log.LogWarning($"Couldn't find {site.DisplayName} in the site usage report. Set inactive site days to {Globals.inactiveDaysDelete}.");
                                         siteDaysInactive = Globals.inactiveDaysDelete;
                                     }
 
@@ -135,7 +142,7 @@ namespace SiteReview
                                         ulong.Parse(storageUsed),
                                         privacySetting,
                                         group.AssignedLabels,
-                                        SiteExists(hubSites, site)
+                                        hubSites.Any(s => s.Id == site.Id)
                                     );
 
                                     siteReport.AddReportData(reportData);
@@ -163,25 +170,6 @@ namespace SiteReview
                 log.LogError($"Error building report - {ex.Message} - {ex.StackTrace}");
                 return siteReport;
             }
-        }
-
-        public static bool SiteExists(IGraphServiceSitesCollectionPage sitePage, Site targetSite)
-        {
-            var currentPage = sitePage;
-
-            while (currentPage != null)
-            {
-                if (currentPage.Contains(targetSite))
-                    return true;
-
-                
-                if (currentPage.NextPageRequest != null)
-                    currentPage = currentPage.NextPageRequest.GetAsync().Result;
-                else
-                    break;
-            }
-
-            return false;
         }
 
         public static async Task<Group> GetGroupFromSite(Site site, GraphServiceClient graphAPIAuth, ILogger log)
@@ -236,28 +224,35 @@ namespace SiteReview
             var siteOwners = new List<User>();
             var group = await GetGroupFromSite(site, graphAPIAuth, log);
 
-            if (group != null)
+            try
             {
-                var owners = await graphAPIAuth.Groups[group.Id].Owners
-                .Request()
-                .GetAsync();
-
-                do
+                if (group != null)
                 {
-                    foreach (var owner in owners)
-                    {
-                        var user = await graphAPIAuth.Users[owner.Id]
-                        .Request()
-                        .Select("displayName,mail")
-                        .GetAsync();
+                    var owners = await graphAPIAuth.Groups[group.Id].Owners
+                    .Request()
+                    .GetAsync();
 
-                        if (user != null)
+                    do
+                    {
+                        foreach (var owner in owners)
                         {
-                            siteOwners.Add(user);
+                            var user = await graphAPIAuth.Users[owner.Id]
+                            .Request()
+                            .Select("displayName,mail")
+                            .GetAsync();
+
+                            if (user != null)
+                            {
+                                siteOwners.Add(user);
+                            }
                         }
                     }
+                    while (owners.NextPageRequest != null && (owners = await owners.NextPageRequest.GetAsync()).Count > 0);
                 }
-                while (owners.NextPageRequest != null && (owners = await owners.NextPageRequest.GetAsync()).Count > 0);
+            }
+            catch (Exception ex)
+            {
+                log.LogError($"Error retrieving site owners for {site.DisplayName} - {ex.Message} - {ex.StackTrace}");
             }
 
             return siteOwners;
@@ -317,7 +312,7 @@ namespace SiteReview
             return success;
         }
 
-        public static async Task<bool> DeleteSite(string siteUrl, ILogger log)
+        public static bool DeleteSite(string siteUrl, ILogger log)
         {
             var success = true;
 
