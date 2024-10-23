@@ -28,21 +28,17 @@ namespace SiteReview
 
             log.LogInformation($"Found {report.NoOwnerSites.Count} sites with less than {Globals.minSiteOwners} owners.");
             log.LogInformation($"Found {report.StorageThresholdSites.Count} sites over {Globals.storageThreshold}% storage capacity.");
-            log.LogInformation($"Found {report.WarningSites.Count + report.DeleteSites.Count} sites inactive for {Globals.inactiveDaysWarn} days or more.");
+            log.LogInformation($"Found {report.WarningSites.Count} sites inactive for {Globals.inactiveDaysWarn} days but less than {Globals.inactiveDaysDelete} days.");
             log.LogInformation($"Found {report.DeleteSites.Count} sites inactive for {Globals.inactiveDaysDelete} days or more.");
             log.LogInformation($"Found {report.PrivacySettingSites.Count} sites that we not set to private.");
             log.LogInformation($"Found {report.ClassificationSites.Count} sites that had no classification.");
             log.LogInformation($"Found {report.HubAssociationSites.Count} sites that were not associated with the hub site {Globals.hubId}.");
 
-            var uniqueListSites = report.GetUniqueListSites();
-            if (uniqueListSites.Count > 0)
-            {
-                var scopes = new[] { "user.read mail.send" };
-                ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
-                var graphClient = new GraphServiceClient(auth, scopes);
+            var scopes = new[] { "user.read mail.send" };
+            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
+            var graphClient = new GraphServiceClient(auth, scopes);
 
-                await Email.SendReportEmail(Globals.adminEmails, uniqueListSites, graphClient, log);
-            }
+            await Email.SendReportEmail(Globals.adminEmails, report, graphClient, log);
 
             if (!Globals.reportOnlyMode)
             {

@@ -5,14 +5,14 @@ namespace SiteReview
 {
     public class ReportData
     {
-        public ReportData(string siteId, string siteUrl, string siteDisplayName, int inactiveDays, List<User> siteOwners, ulong storageCapacity, ulong storageUsed, string privacySetting, IEnumerable<AssignedLabel> assignedLabels, bool inHub)
+        public ReportData(string siteId, string siteUrl, string siteDisplayName, int inactiveDays, List<User> siteOwners, ulong storageAllocated, ulong storageUsed, string privacySetting, IEnumerable<AssignedLabel> assignedLabels, bool inHub)
         {
             SiteId = siteId;
             SiteUrl = siteUrl;
             SiteDisplayName = siteDisplayName;
             InactiveDays = inactiveDays;
             SiteOwners = siteOwners;
-            StorageCapacity = storageCapacity;
+            StorageAllocated = storageAllocated;
             StorageUsed = storageUsed;
             PrivacySetting = privacySetting;
             AssignedLabels = assignedLabels;
@@ -24,7 +24,7 @@ namespace SiteReview
         public string SiteDisplayName { get; set; }
         public int InactiveDays { get; set; }
         public List<User> SiteOwners { get; set; }
-        public ulong StorageCapacity { get; set; }
+        public ulong StorageAllocated { get; set; }
         public ulong StorageUsed { get; set; }
         public string PrivacySetting { get; set; }
         public IEnumerable<AssignedLabel> AssignedLabels { get; set; }

@@ -12,26 +12,55 @@ namespace SiteReview
 {
     public static class Email
     {
-        public static async Task<bool> SendReportEmail(string[] userEmails, List<ReportData> reportData, GraphServiceClient graphAPIAuth, ILogger log)
+        public static async Task<bool> SendReportEmail(string[] userEmails, SiteReport report, GraphServiceClient graphAPIAuth, ILogger log)
         {
+            var uniqueListOfSites = report.GetUniqueListSites();
             List<Task> emailTasks = new List<Task>();
+
+            if (uniqueListOfSites.Count == 0)
+            {
+                foreach (var email in userEmails)
+                {
+                    emailTasks.Add(SendEmail(
+                        email,
+                        "Site Review Report",
+                        "Greetings,<br><br>We found <b>0</b> sites flagged for review.<br>Woohoo! &#128513;<br><br>" +
+                        "Regards,<br>The GCX Team",
+                        BodyType.Html,
+                        graphAPIAuth,
+                        log
+                    ));
+                }
+                return true;
+            } 
+
             foreach (var email in userEmails)
             {
                 emailTasks.Add(SendEmail(
                     email,
-                    $"Site Review Report",
-                    $"Greetings,<br><br>We found {reportData.Count + (reportData.Count == 1 ? $" site" : " sites")} flagged for review.<br>Please note that <b>bolded text</b> indicates a violation of our policies.<br><br><ol>" +
+                    "Site Review Report",
+                    $"Greetings,<br><br>We found <b>{uniqueListOfSites.Count + (uniqueListOfSites.Count == 1 ? $" site" : " unique sites")}</b> flagged for review.<br><br>" +
+                    "The count for each category violation is as follows...<br>" +
+                    "<i style=\"font-size: x-small;\">(Sites can be flagged for multiple category violations and may exceed the unique sites total when tallied.)</i><ul>" +
+                    $"<li>{report.WarningSites.Count} sites inactive for {Globals.inactiveDaysWarn} days or more, but less than {Globals.inactiveDaysDelete} days.</li>" +
+                    $"<li>{report.DeleteSites.Count} sites inactive for {Globals.inactiveDaysDelete} days or more.</li>" +
+                    $"<li>{report.HubAssociationSites.Count} sites not associated with the hub {Globals.hubId}.</li>" +
+                    $"<li>{report.NoOwnerSites.Count} sites with less than {Globals.minSiteOwners} owners.</li>" +
+                    $"<li>{report.ClassificationSites.Count} sites with no classification label.</li>" +
+                    $"<li>{report.PrivacySettingSites.Count} sites without the \"{Globals.expectedPrivacySetting}\" privacy setting.</li>" +
+                    $"<li>{report.StorageThresholdSites.Count} sites with {Globals.storageThreshold}% storage used or more.</li></ul>" +
+                    "Please note that <b>bolded text</b> indicates a violation of our policy.<br><br><ol>" +
                     string.Join(
                         "<hr>",
-                        reportData.Select(item =>
+                        uniqueListOfSites.Select(item =>
                             "<li>" +
                             $"Site: <a href='{item.SiteUrl}' target='_blank'>{item.SiteDisplayName}</a><br>" +
                             $"In Hub: {(item.InHub == false ? "<b>" + item.InHub + "</b>" : item.InHub)}<br>" +
                             $"Classification: {(item.AssignedLabels.Any() == false ? "<b>None</b>" : string.Join(", ", item.AssignedLabels.Select(m => m.DisplayName)))}<br>" +
-                            $"Privacy: {(item.PrivacySetting != "Private" ? "<b>" + (item.PrivacySetting != null ? item.PrivacySetting : "null") + "</b>" : item.PrivacySetting)}<br>" +
+                            $"Privacy: {(item.PrivacySetting != "Private" ? "<b>" + (item.PrivacySetting ?? "null") + "</b>" : item.PrivacySetting)}<br>" +
                             $"Owners: {(item.SiteOwners.Count < Globals.minSiteOwners ? "<b>" + item.SiteOwners.Count + "</b>" : item.SiteOwners.Count)}<br>" +
                             $"Inactive: {(item.InactiveDays >= Globals.inactiveDaysWarn ? "<b>" + item.InactiveDays + " days</b>" : item.InactiveDays + " days") }<br>" +
-                            $"Storage Used: {(item.StorageUsed / item.StorageCapacity * 100 >= Globals.storageThreshold ? "<b>" + (item.StorageUsed / item.StorageCapacity * 100).ToString("F2") + "%</b>" : (item.StorageUsed / item.StorageCapacity * 100).ToString("F2") + "%")}<br>" +
+                            $"Storage Used: {(((double)item.StorageUsed / (double)item.StorageAllocated) * (double)100 >= Globals.storageThreshold ? "<b>" + (((double)item.StorageUsed / (double)item.StorageAllocated) * (double)100).ToString("F6") + "%</b>" : (((double)item.StorageUsed / (double)item.StorageAllocated) * (double)100).ToString("F6") + "%")}<br>" +
                             $"Owner Emails: {(item.SiteOwners.Any() ? string.Join(", ", item.SiteOwners.Select(m => m.Mail)) : "<b>None</b>")}" +
                             "</li>"
                         )

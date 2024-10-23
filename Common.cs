@@ -89,6 +89,8 @@ namespace SiteReview
 
                 var sitePage = 1;
                 var totalSites = 0;
+                var teamsSites = 0;
+
                 do
                 {
                     log.LogInformation($"{Environment.NewLine}Checking site page {sitePage} containing {allSites.Count} sites...{Environment.NewLine}");
@@ -106,13 +108,13 @@ namespace SiteReview
                         if (group != null)
                         {
                             log.LogInformation($"Checking {site.DisplayName} ...");
+                            teamsSites++;
 
                             // Build the report
                             for (var i = 1; i < siteCSV.Count; i++)
                             {
                                 var siteId = siteCSV[i][siteSiteIdIndex];
                                 var lastActivityDate = siteCSV[i][siteLastActivityIndex];
-                                var siteURL = siteCSV[i][siteSiteURLIndex];
                                 var storageUsed = siteCSV[i][siteStorageUsedIndex];
                                 var storageAllocated = siteCSV[i][siteStorageAllocatedIndex];
                                 var foundSite = site.Id.Split(",")[1] == siteId;
@@ -126,20 +128,21 @@ namespace SiteReview
                                         log.LogWarning($"Couldn't find {site.DisplayName} in the site usage report. Set inactive site days to {Globals.inactiveDaysDelete}.");
                                         siteDaysInactive = Globals.inactiveDaysDelete;
                                     }
+                                    else
+                                        siteDaysInactive = lastActivityDate != String.Empty ? (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays : Globals.inactiveDaysDelete;
 
-                                    siteDaysInactive = lastActivityDate != String.Empty ? (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays : Globals.inactiveDaysDelete;
                                     var teamDaysInactive = GetTeamsActivity(teamsActivityCSV, site.DisplayName, log);
-                                    var siteOwners = await GetSiteOwners(site, graphAPIAuth, log);
+                                    var siteOwners = await GetSiteOwners(site, graphAPIAuth, log, group);
                                     var privacySetting = group.Visibility ?? null;
 
                                     var reportData = new ReportData(
-                                        siteId,
+                                        site.Id.Split(",")[1],
                                         site.WebUrl,
                                         site.DisplayName,
                                         (int)Math.Min(siteDaysInactive, teamDaysInactive),
                                         siteOwners,
-                                        ulong.Parse(storageAllocated),
-                                        ulong.Parse(storageUsed),
+                                        ulong.Parse(foundSite ? storageAllocated : null),
+                                        ulong.Parse(foundSite ? storageUsed : null),
                                         privacySetting,
                                         group.AssignedLabels,
                                         hubSites.Any(s => s.Id == site.Id)
@@ -161,7 +164,9 @@ namespace SiteReview
                 }
                 while (allSites.NextPageRequest != null && (allSites = await allSites.NextPageRequest.GetAsync()).Count > 0);
 
-                log.LogInformation($"{Environment.NewLine}{totalSites} sites were scanned in total.{Environment.NewLine}");
+                log.LogInformation($"{Environment.NewLine}{totalSites} sites were scanned in total.");
+                log.LogInformation($"{teamsSites} of those were found to be teams sites.");
+                log.LogInformation($"{siteReport.GetUniqueListSites().Count} of those were in violation of one or more of our policies.{Environment.NewLine}");
 
                 return siteReport;
             }
@@ -185,30 +190,25 @@ namespace SiteReview
                     }
 
                     var escapedSiteName = site.Name.Replace(",", "%2C").Replace("&", "%26").Replace("(", "%28").Replace(")", "%29").Replace("é", "%C3%A9").Replace("É", "%C3%89").Replace(" ", "%20").Replace("'", "''");
+                    if (escapedSiteName.Length > 100)
+                        escapedSiteName = escapedSiteName.Substring(0, 99);
 
                     var groups = await graphAPIAuth.Groups
-                    .Request(new List<QueryOption>(){
-                        new QueryOption("$search", "\"mailNickname:" + escapedSiteName + "\"")
-                    })
-                    .Header("ConsistencyLevel", "eventual")
-                    .Select("id,displayName,mail,mailNickname,groupTypes,visibility,classification,assignedLicenses,assignedLabels")
-                    .GetAsync();
-
-                    if (groups != null && groups.Count > 0)
-                    {
-                        if (groups[0] != null)
-                            return groups[0];
-                    }
-
-                    groups = await graphAPIAuth.Groups
                     .Request()
-                    .Filter($"displayName eq '{escapedSiteName}'")
+                    .Filter($"startswith(displayName, '{escapedSiteName}')")
                     .Header("ConsistencyLevel", "eventual")
                     .Select("id,displayName,mail,mailNickname,groupTypes,visibility,classification,assignedLicenses,assignedLabels")
                     .GetAsync();
 
-                    if (groups != null && groups.Count > 0)
-                        return groups[0];
+                    do
+                    {
+                        foreach (var group in groups)
+                        {
+                            if (group.DisplayName == site.Name)
+                                return group;
+                        }
+                    }
+                    while (groups.NextPageRequest != null && (groups = await groups.NextPageRequest.GetAsync()).Count > 0);
                 }
             }
             catch (Exception e)
@@ -219,10 +219,12 @@ namespace SiteReview
             return null;
         }
 
-        private static async Task<List<User>> GetSiteOwners(Site site, GraphServiceClient graphAPIAuth, ILogger log)
+        private static async Task<List<User>> GetSiteOwners(Site site, GraphServiceClient graphAPIAuth, ILogger log, Group group = null)
         {
             var siteOwners = new List<User>();
-            var group = await GetGroupFromSite(site, graphAPIAuth, log);
+
+            if (group == null)
+                group = await GetGroupFromSite(site, graphAPIAuth, log);
 
             try
             {

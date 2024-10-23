@@ -34,7 +34,7 @@ namespace SiteReview
             if (reportData.SiteOwners.Count < Globals.minSiteOwners)
                 NoOwnerSites.Add(reportData);
 
-            var usedPercentage = reportData.StorageUsed / reportData.StorageCapacity * 100;
+            double usedPercentage = ((double)reportData.StorageUsed / (double)reportData.StorageAllocated) * (double)100;
             if (usedPercentage >= Globals.storageThreshold)
                 StorageThresholdSites.Add(reportData);
 
@@ -50,15 +50,18 @@ namespace SiteReview
 
         public List<ReportData> GetUniqueListSites()
         {
-            return WarningSites
+            var uniqueSites = WarningSites
                 .Concat(DeleteSites)
                 .Concat(NoOwnerSites)
                 .Concat(StorageThresholdSites)
                 .Concat(PrivacySettingSites)
                 .Concat(ClassificationSites)
+                .Concat(HubAssociationSites)
                 .GroupBy(site => site.SiteId)
                 .Select(site => site.First())
                 .ToList();
+
+            return uniqueSites;
         }
     }
 }
