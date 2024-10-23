@@ -1,11 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace SiteReview
 {
     public class SiteReport
     {
-        public SiteReport()
+        private ILogger _log;
+
+        public SiteReport(ILogger log)
         {
             WarningSites = new List<ReportData>();
             DeleteSites = new List<ReportData>();
@@ -14,6 +17,7 @@ namespace SiteReview
             PrivacySettingSites = new List<ReportData>();
             ClassificationSites = new List<ReportData>();
             HubAssociationSites = new List<ReportData>();
+            _log = log;
         }
 
         public List<ReportData> WarningSites { get; set; }
@@ -34,9 +38,16 @@ namespace SiteReview
             if (reportData.SiteOwners.Count < Globals.minSiteOwners)
                 NoOwnerSites.Add(reportData);
 
-            double usedPercentage = ((double)reportData.StorageUsed / (double)reportData.StorageAllocated) * (double)100;
-            if (usedPercentage >= Globals.storageThreshold)
-                StorageThresholdSites.Add(reportData);
+            if (reportData.StorageAllocated != 0)
+            {
+                double usedPercentage = ((double)reportData.StorageUsed / (double)reportData.StorageAllocated) * (double)100;
+                if (usedPercentage >= Globals.storageThreshold)
+                    StorageThresholdSites.Add(reportData);
+            }
+            else
+            {
+                _log.LogWarning($"No storage information was provided for {reportData.SiteDisplayName}");
+            }
 
             if (reportData.PrivacySetting != Globals.expectedPrivacySetting)
                 PrivacySettingSites.Add(reportData);

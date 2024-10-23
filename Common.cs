@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using AngleSharp.Dom;
+using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Online.SharePoint.TenantAdministration;
 using System;
@@ -15,7 +16,7 @@ namespace SiteReview
         public static readonly string DeleteSiteIdsContainerName = "delete";
         public static async Task<SiteReport> GetReport(GraphServiceClient graphAPIAuth, ILogger log)
         {
-            var siteReport = new SiteReport();
+            var siteReport = new SiteReport(log);
 
             try
             {
@@ -107,7 +108,7 @@ namespace SiteReview
 
                         if (group != null)
                         {
-                            log.LogInformation($"Checking {site.DisplayName} ...");
+                            log.LogInformation($"{Environment.NewLine}Checking {site.DisplayName} ...");
                             teamsSites++;
 
                             // Build the report
@@ -129,7 +130,20 @@ namespace SiteReview
                                         siteDaysInactive = Globals.inactiveDaysDelete;
                                     }
                                     else
+                                    {
+                                        log.LogInformation(Environment.NewLine +
+                                            $"Site activity report for {site.DisplayName}{Environment.NewLine}" +
+                                            $"siteId: {siteCSV[i][siteSiteIdIndex]}{Environment.NewLine}" +
+                                            $"lastActivityDate: {siteCSV[i][siteLastActivityIndex]}{Environment.NewLine}" +
+                                            $"storageAllocated: {siteCSV[i][siteStorageAllocatedIndex]} bytes{Environment.NewLine}" +
+                                            $"storageUsed: {siteCSV[i][siteStorageUsedIndex]} bytes" 
+                                        );
+
                                         siteDaysInactive = lastActivityDate != String.Empty ? (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays : Globals.inactiveDaysDelete;
+
+                                        if (lastActivityDate == string.Empty)
+                                            log.LogWarning($"Unable to find site activity for {site.DisplayName}. Set inactive site days to 120.");
+                                    }
 
                                     var teamDaysInactive = GetTeamsActivity(teamsActivityCSV, site.DisplayName, log);
                                     var siteOwners = await GetSiteOwners(site, graphAPIAuth, log, group);
@@ -141,8 +155,8 @@ namespace SiteReview
                                         site.DisplayName,
                                         (int)Math.Min(siteDaysInactive, teamDaysInactive),
                                         siteOwners,
-                                        ulong.Parse(foundSite ? storageAllocated : null),
-                                        ulong.Parse(foundSite ? storageUsed : null),
+                                        ulong.Parse(foundSite ? storageAllocated : "0"),
+                                        ulong.Parse(foundSite ? storageUsed : "0"),
                                         privacySetting,
                                         group.AssignedLabels,
                                         hubSites.Any(s => s.Id == site.Id)
@@ -271,6 +285,11 @@ namespace SiteReview
                 {
                     if (teamsActivityCSV[i][teamNameIndex] == siteDisplayName)
                     {
+                        log.LogInformation(Environment.NewLine +
+                            $"Teams activity report for {siteDisplayName}{Environment.NewLine}" +
+                            $"lastActivityDate: {teamsActivityCSV[i][lastActivityIndex]}"
+                        );
+
                         var teamLastActivityDate = teamsActivityCSV[i][lastActivityIndex];
                         if (teamLastActivityDate != String.Empty)
                             return (DateTime.Now - DateTime.Parse(teamLastActivityDate)).TotalDays;
