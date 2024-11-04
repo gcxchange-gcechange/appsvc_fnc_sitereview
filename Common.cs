@@ -98,7 +98,7 @@ namespace SiteReview
 
                     foreach (var site in allSites)
                     {
-                        if (excludeSiteIds.Contains(site.Id))
+                        if (excludeSiteIds.Contains(site.Id.Split(",")[1]))
                         {
                             log.LogInformation($"Skipped excluded site: {site.DisplayName}");
                             continue;
@@ -135,8 +135,8 @@ namespace SiteReview
                                             $"Site activity report for {site.DisplayName}{Environment.NewLine}" +
                                             $"siteId: {siteCSV[i][siteSiteIdIndex]}{Environment.NewLine}" +
                                             $"lastActivityDate: {siteCSV[i][siteLastActivityIndex]}{Environment.NewLine}" +
-                                            $"storageAllocated: {siteCSV[i][siteStorageAllocatedIndex]} bytes{Environment.NewLine}" +
-                                            $"storageUsed: {siteCSV[i][siteStorageUsedIndex]} bytes" 
+                                            $"storageAllocated: {siteCSV[i][siteStorageAllocatedIndex]} Bytes{Environment.NewLine}" +
+                                            $"storageUsed: {siteCSV[i][siteStorageUsedIndex]} Bytes" 
                                         );
 
                                         siteDaysInactive = lastActivityDate != String.Empty ? (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays : Globals.inactiveDaysDelete;
