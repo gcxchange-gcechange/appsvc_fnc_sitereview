@@ -23,8 +23,8 @@ namespace SiteReview
         public static readonly string appOnlyId = GetEnvironmentString("appOnlyId");
         public static readonly string secretNameAppOnly = GetEnvironmentString("secretNameAppOnly");
 
-        public static readonly int inactiveDaysWarn = GetEnvironmentInt("inactiveDaysWarn", 0, 180);
-        public static readonly int inactiveDaysDelete = GetEnvironmentInt("inactiveDaysDelete", 0, 180);
+        public static readonly int inactiveDaysWarn = GetEnvironmentInt("inactiveDaysWarn", 0);
+        public static readonly int inactiveDaysDelete = GetEnvironmentInt("inactiveDaysDelete", 0);
         public static readonly int minSiteOwners = GetEnvironmentInt("minSiteOwners", 0);
         public static readonly double storageThreshold = GetEnvironmentDouble("storageThreshold", 0, 100);
         public static readonly string expectedPrivacySetting = GetEnvironmentString("expectedPrivacySetting");
