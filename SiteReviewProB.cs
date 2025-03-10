@@ -19,6 +19,7 @@ namespace SiteReviewProB
         [HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequest req,
         ILogger log, ExecutionContext executionContext)
         {
+            
             log.LogInformation($"SiteReviewProB timer trigger function executed at: {DateTime.Now}");
 
             try
@@ -91,15 +92,18 @@ namespace SiteReviewProB
                 {
                     return group.Visibility;
                 }
+                else
+                {
+                    log.LogWarning($"Group not found for siteId {siteId}");
+                }
             }
             catch (Exception ex)
             {
                 log.LogError($"Failed to get site privacy setting for siteId {siteId}: {ex.Message}");
             }
 
-            return null;
+            return "Unknown";
         }
-
         private static async Task SendReportEmailProB(List<Site> publicSites, GraphServiceClient graphAPIAuth, ILogger log)
         {
             var userEmails = new[] { "email1@example.com", "email2@example.com" }; // add the email addresses to be emailed to
