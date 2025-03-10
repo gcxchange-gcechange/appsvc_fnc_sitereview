@@ -2,7 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using SiteReview;
@@ -12,8 +15,9 @@ namespace SiteReviewProB
     public static class SiteReviewProB
     {
         [FunctionName("SiteReviewProB")]
-        public static async Task RunProB(
-            [TimerTrigger("0 0 * * * *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+        public static async Task<IActionResult> RunProB(
+        [HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequest req,
+        ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReviewProB timer trigger function executed at: {DateTime.Now}");
 
@@ -44,6 +48,8 @@ namespace SiteReviewProB
             {
                 log.LogError($"An error occurred: {ex.Message}");
             }
+
+            return new OkObjectResult("HTTP trigger executed successfully.");
         }
 
         private static async Task<List<Site>> GetProtectedBSites(GraphServiceClient graphClient, ILogger log)
@@ -55,7 +61,7 @@ namespace SiteReviewProB
                 var siteCollectionPage = await graphClient.Sites.Request().GetAsync();
                 while (siteCollectionPage != null)
                 {
-                    sites.AddRange(siteCollectionPage.Where(site => site.WebUrl.Contains("/teams/b") && site.AdditionalData.ContainsKey("classification") && site.AdditionalData["classification"].ToString() == "Protected B"));
+                    sites.AddRange(siteCollectionPage.Where(site => site.WebUrl.Contains("/teams/b")));
                     if (siteCollectionPage.NextPageRequest != null)
                     {
                         siteCollectionPage = await siteCollectionPage.NextPageRequest.GetAsync();
