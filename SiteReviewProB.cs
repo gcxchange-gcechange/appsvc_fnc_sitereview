@@ -39,7 +39,7 @@ namespace SiteReviewProB
 
                 if (publicSites.Any())
                 {
-                    await SendReportEmail(publicSites, graphAPIAuth, log);
+                    await SendReportEmailProB(publicSites, graphAPIAuth, log);
                 }
 
                 log.LogInformation("Function app executed successfully");
@@ -85,60 +85,65 @@ namespace SiteReviewProB
             try
             {
                 var site = await graphClient.Sites[siteId].Request().GetAsync();
-                var siteDrive = await graphClient.Sites[siteId].Drive.Request().GetAsync();
-                var permissions = await graphClient.Sites[siteId].Permissions.Request().GetAsync();
-                var isPublic = permissions.Any(p => p.Roles.Contains("read") && p.GrantedToV2.User != null);
-                return isPublic ? "Public" : "Private";
+                var group = await Common.GetGroupFromSite(site, graphClient, log);
+
+                if (group != null)
+                {
+                    return group.Visibility;
+                }
             }
             catch (Exception ex)
             {
-                log.LogError($"Failed to get privacy setting for site {siteId}: {ex.Message}");
-                return "Unknown";
+                log.LogError($"Failed to get site privacy setting for siteId {siteId}: {ex.Message}");
             }
+
+            return null;
         }
 
-        private static async Task SendReportEmail(List<Site> publicSites, GraphServiceClient graphClient, ILogger log)
+        private static async Task SendReportEmailProB(List<Site> publicSites, GraphServiceClient graphAPIAuth, ILogger log)
         {
-            var emailAddresses = new List<string> { "admin1@example.com", "admin2@example.com" }; // need to replace with actual email addresses
+            var userEmails = new[] { "email1@example.com", "email2@example.com" }; // add the email addresses to be emailed to
 
-            var emailBody = "The following Protected B sites are set to public:\n\n";
-            foreach (var site in publicSites)
+            var siteDetails = publicSites.Select(site =>
+                $"Site Name: {site.DisplayName}<br>Site URL: <a href='{site.WebUrl}'>{site.WebUrl}</a><br><br>"
+            );
+
+            var emailBody = $@"
+                Greetings,<br><br>
+                The following Protected B sites have their privacy setting set to public:<br><br>
+                {string.Join("<hr>", siteDetails)}
+                Please review these sites and take necessary actions.<br><br>
+                Regards,<br>The GCX Team";
+
+            List<Task> emailTasks = new List<Task>();
+
+            foreach (var email in userEmails)
             {
-                emailBody += $"- {site.DisplayName} ({site.WebUrl})\n";
+                emailTasks.Add(SendEmailWrapper(
+                    email,
+                    "Protected B Sites Public Privacy Setting Report",
+                    emailBody,
+                    BodyType.Html,
+                    graphAPIAuth,
+                    log
+                ));
             }
 
-            foreach (var email in emailAddresses)
-            {
-                var message = new Message
-                {
-                    Subject = "Public Protected B Sites Report",
-                    Body = new ItemBody
-                    {
-                        ContentType = BodyType.Text,
-                        Content = emailBody
-                    },
-                    ToRecipients = new List<Recipient>
-                    {
-                        new Recipient
-                        {
-                            EmailAddress = new EmailAddress
-                            {
-                                Address = email
-                            }
-                        }
-                    }
-                };
-
-                try
-                {
-                    await graphClient.Me.SendMail(message).Request().PostAsync();
-                    log.LogInformation($"Report email sent to {email}");
-                }
-                catch (Exception ex)
-                {
-                    log.LogError($"Failed to send report email to {email}: {ex.Message}");
-                }
-            }
+            await Task.WhenAll(emailTasks);
         }
+
+        private static async Task<bool> SendEmailWrapper(string userEmail, string emailSubject, string emailBody, BodyType bodyType, GraphServiceClient graphAPIAuth, ILogger log)
+        {
+            var emailType = typeof(Email);
+            var sendEmailMethod = emailType.GetMethod("SendEmail", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            if (sendEmailMethod != null)
+            {
+                var task = (Task<bool>)sendEmailMethod.Invoke(null, new object[] { userEmail, emailSubject, emailBody, bodyType, graphAPIAuth, log });
+                return await task;
+            }
+            log.LogError("Failed to invoke SendEmail method.");
+            return false;
+        }
+
     }
 }
