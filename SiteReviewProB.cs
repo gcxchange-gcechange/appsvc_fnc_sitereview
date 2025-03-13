@@ -33,7 +33,17 @@ namespace SiteReviewProB
 
                 foreach (var site in sites)
                 {
-                    var sitePrivacySetting = await GetSitePrivacySetting(graphAPIAuth, site.Id, log);
+                    var siteIdParts = site.Id.Split(',');
+                    if (siteIdParts.Length < 2)
+                    {
+                        log.LogWarning($"Invalid site ID format for site: {site.Id}");
+                        continue;
+                    }
+
+                    var siteId = siteIdParts[1]; // site ID GUID
+                    log.LogInformation($"Extracted site ID: {siteId}");
+
+                    var sitePrivacySetting = await GetSitePrivacySetting(graphAPIAuth, siteId, log);
                     log.LogInformation($"Site {site.Id} privacy setting: {sitePrivacySetting}");
 
                     if (sitePrivacySetting == "Public")
@@ -92,25 +102,44 @@ namespace SiteReviewProB
 
         private static async Task<string> GetSitePrivacySetting(GraphServiceClient graphClient, string siteId, ILogger log)
         {
-            log.LogInformation($"Getting privacy setting for site: {siteId}");
             try
             {
-                var site = await graphClient.Sites[siteId].Request().GetAsync();
-                var group = await Common.GetGroupFromSite(site, graphClient, log);
+                log.LogInformation($"Requesting privacy setting for site ID: {siteId}");
 
+                // will retrieve the site details
+                var site = await graphClient.Sites[siteId].Request().GetAsync();
+                if (site == null)
+                {
+                    log.LogWarning($"Site with ID {siteId} not found.");
+                    return "Unknown";
+                }
+
+                // will retrieve the group associated with the site
+                var group = await graphClient.Groups[siteId].Request().GetAsync();
                 if (group != null)
                 {
-                    log.LogInformation($"Group found for site: {siteId}, privacy setting: {group.Visibility}");
-                    return group.Visibility;
+                    log.LogInformation($"Group {group.Id} has visibility: {group.Visibility}");
+                    return group.Visibility?.ToString();
                 }
                 else
                 {
-                    log.LogWarning($"Group not found for siteId {siteId}");
+                    log.LogWarning($"No associated group found for site with ID {siteId}");
+                }
+            }
+            catch (ServiceException ex)
+            {
+                if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    log.LogWarning($"Group with ID {siteId} not found.");
+                }
+                else
+                {
+                    log.LogError($"Failed to get site privacy setting for group {siteId}: {ex.Message}");
                 }
             }
             catch (Exception ex)
             {
-                log.LogError($"Failed to get site privacy setting for siteId {siteId}: {ex.Message}");
+                log.LogError($"An error occurred while getting the site privacy setting for group {siteId}: {ex.Message}");
             }
 
             return "Unknown";
@@ -119,7 +148,7 @@ namespace SiteReviewProB
         private static async Task SendReportEmailProB(List<Site> publicSites, GraphServiceClient graphAPIAuth, ILogger log)
         {
             log.LogInformation("Preparing to send report email for public sites.");
-            var userEmails = new[] { "email1@example.com", "email2@example.com" }; // need add the email addresses to be emailed to
+            var userEmails = new[] { "email1@example.com", "email2@example.com" }; // add the email addresses to be emailed to
 
             var siteDetails = publicSites.Select(site =>
                 $"Site Name: {site.DisplayName}<br>Site URL: <a href='{site.WebUrl}'>{site.WebUrl}</a><br><br>"
