@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Graph;
 using SiteReview;
+using Microsoft.IdentityModel.Tokens;
 
 namespace SiteReviewProB
 {
@@ -23,6 +25,12 @@ namespace SiteReviewProB
 
             try
             {
+                var config = new ConfigurationBuilder()
+                    .SetBasePath(executionContext.FunctionAppDirectory)
+                    .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
+                    .AddEnvironmentVariables()
+                    .Build();
+
                 var graphAPIAuth = new Auth().graphAuth(log);
                 log.LogInformation("Graph API authentication successful.");
 
@@ -33,30 +41,37 @@ namespace SiteReviewProB
 
                 foreach (var site in sites)
                 {
-                    var siteIdParts = site.Id.Split(',');
-                    if (siteIdParts.Length < 2)
-                    {
-                        log.LogWarning($"Invalid site ID format for site: {site.Id}");
-                        continue;
-                    }
+                    log.LogInformation($"Processing site: {site.DisplayName}");
 
-                    var siteId = siteIdParts[1]; // site ID GUID
-                    log.LogInformation($"Extracted site ID: {siteId}");
-
-                    var sitePrivacySetting = await GetSitePrivacySetting(graphAPIAuth, siteId, log);
-                    log.LogInformation($"Site {site.Id} privacy setting: {sitePrivacySetting}");
+                    var sitePrivacySetting = await GetSitePrivacySetting(graphAPIAuth, site, log);
+                    log.LogInformation($"Site {site.DisplayName} privacy setting: {sitePrivacySetting}");
 
                     if (sitePrivacySetting == "Public")
                     {
                         publicSites.Add(site);
-                        log.LogInformation($"Site {site.Id} added to public sites list.");
+                        log.LogInformation($"Site {site.DisplayName} added to public sites list.");
                     }
                 }
 
                 if (publicSites.Any())
                 {
                     log.LogInformation("Public sites found, sending report email.");
-                    await SendReportEmailProB(publicSites, graphAPIAuth, log);
+                    var emailRecipients = config["AdminEmails"];
+                    log.LogInformation($"AdminEmails: {emailRecipients}");
+                    if (string.IsNullOrEmpty(emailRecipients))
+                    {
+                        log.LogError("AdminEmails setting is not configured.");
+                        throw new InvalidOperationException("AdminEmails setting is not configured.");
+                    }
+
+                    var recipientEmails = emailRecipients.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+                    var report = new SiteReport(log)
+                    {
+                        UniqueSites = publicSites
+                    };
+
+                    await SendReportEmailProB(recipientEmails, report, graphAPIAuth, log);
                 }
 
                 log.LogInformation("Function app executed successfully");
@@ -100,22 +115,13 @@ namespace SiteReviewProB
             return sites;
         }
 
-        private static async Task<string> GetSitePrivacySetting(GraphServiceClient graphClient, string siteId, ILogger log)
+        private static async Task<string> GetSitePrivacySetting(GraphServiceClient graphClient, Site site, ILogger log)
         {
             try
             {
-                log.LogInformation($"Requesting privacy setting for site ID: {siteId}");
+                log.LogInformation($"Requesting privacy setting for site: {site.DisplayName}");
 
-                // will retrieve the site details
-                var site = await graphClient.Sites[siteId].Request().GetAsync();
-                if (site == null)
-                {
-                    log.LogWarning($"Site with ID {siteId} not found.");
-                    return "Unknown";
-                }
-
-                // will retrieve the group associated with the site
-                var group = await graphClient.Groups[siteId].Request().GetAsync();
+                var group = await Common.GetGroupFromSite(site, graphClient, log);
                 if (group != null)
                 {
                     log.LogInformation($"Group {group.Id} has visibility: {group.Visibility}");
@@ -123,77 +129,20 @@ namespace SiteReviewProB
                 }
                 else
                 {
-                    log.LogWarning($"No associated group found for site with ID {siteId}");
-                }
-            }
-            catch (ServiceException ex)
-            {
-                if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-                {
-                    log.LogWarning($"Group with ID {siteId} not found.");
-                }
-                else
-                {
-                    log.LogError($"Failed to get site privacy setting for group {siteId}: {ex.Message}");
+                    log.LogWarning($"No associated group found for site: {site.DisplayName}");
                 }
             }
             catch (Exception ex)
             {
-                log.LogError($"An error occurred while getting the site privacy setting for group {siteId}: {ex.Message}");
+                log.LogError($"An error occurred while getting the site privacy setting for site {site.DisplayName}: {ex.Message}");
             }
 
             return "Unknown";
         }
 
-        private static async Task SendReportEmailProB(List<Site> publicSites, GraphServiceClient graphAPIAuth, ILogger log)
+        private static async Task SendReportEmailProB(string[] recipientEmails, SiteReport report, GraphServiceClient graphAPIAuth, ILogger log)
         {
-            log.LogInformation("Preparing to send report email for public sites.");
-            var userEmails = new[] { "email1@example.com", "email2@example.com" }; // add the email addresses to be emailed to
-
-            var siteDetails = publicSites.Select(site =>
-                $"Site Name: {site.DisplayName}<br>Site URL: <a href='{site.WebUrl}'>{site.WebUrl}</a><br><br>"
-            );
-
-            var emailBody = $@"
-                Greetings,<br><br>
-                The following Protected B sites have their privacy setting set to public:<br><br>
-                {string.Join("<hr>", siteDetails)}
-                Please review these sites and take necessary actions.<br><br>
-                Regards,<br>The GCX Team";
-
-            List<Task> emailTasks = new List<Task>();
-
-            foreach (var email in userEmails)
-            {
-                log.LogInformation($"Sending email to: {email}");
-                emailTasks.Add(SendEmailWrapper(
-                    email,
-                    "Protected B Sites Public Privacy Setting Report",
-                    emailBody,
-                    BodyType.Html,
-                    graphAPIAuth,
-                    log
-                ));
-            }
-
-            await Task.WhenAll(emailTasks);
-            log.LogInformation("Report email sent successfully.");
-        }
-
-        private static async Task<bool> SendEmailWrapper(string userEmail, string emailSubject, string emailBody, BodyType bodyType, GraphServiceClient graphAPIAuth, ILogger log)
-        {
-            log.LogInformation($"Invoking SendEmail method for user: {userEmail}");
-            var emailType = typeof(Email);
-            var sendEmailMethod = emailType.GetMethod("SendEmail", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-
-            if (sendEmailMethod != null)
-            {
-                var task = (Task<bool>)sendEmailMethod.Invoke(null, new object[] { userEmail, emailSubject, emailBody, bodyType, graphAPIAuth, log });
-                log.LogInformation($"Email send task for user: {userEmail} started.");
-                return await task;
-            }
-            log.LogError("Failed to invoke SendEmail method.");
-            return false;
+            await Email.SendReportEmail(recipientEmails, report, graphAPIAuth, log);
         }
     }
 }

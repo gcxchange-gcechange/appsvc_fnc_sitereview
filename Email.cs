@@ -191,7 +191,9 @@ namespace SiteReview
                     }
                 };
 
-                await graphAPIAuth.Users[Globals.emailUserName]
+                log.LogInformation($"What email is this? {Globals.emailUserName}");
+
+                await graphAPIAuth.Users["f1653911-2a97-4492-ad94-ebd7eb17ccfd"] // hard coding it in for now, Shea would need to check this
                 .SendMail(message, null)
                 .Request()
                 .PostAsync();
