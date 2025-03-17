@@ -31,13 +31,10 @@ namespace SiteReviewProB
                     .AddEnvironmentVariables()
                     .Build();
 
-                var scopes = new[] { "user.read", "mail.send" };
-                ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
-                var graphClient = new GraphServiceClient(auth, scopes);
-
+                var graphAPIAuth = new Auth().graphAuth(log);
                 log.LogInformation("Graph API authentication successful.");
 
-                var sites = await GetProtectedBSites(graphClient, log);
+                var sites = await GetProtectedBSites(graphAPIAuth, log);
                 log.LogInformation($"Retrieved {sites.Count} protected B sites.");
 
                 var publicSites = new List<Site>();
@@ -46,7 +43,7 @@ namespace SiteReviewProB
                 {
                     log.LogInformation($"Processing site: {site.DisplayName}");
 
-                    var sitePrivacySetting = await GetSitePrivacySetting(graphClient, site, log);
+                    var sitePrivacySetting = await GetSitePrivacySetting(graphAPIAuth, site, log);
                     log.LogInformation($"Site {site.DisplayName} privacy setting: {sitePrivacySetting}");
 
                     if (sitePrivacySetting == "Public")
@@ -69,9 +66,11 @@ namespace SiteReviewProB
 
                     var recipientEmails = emailRecipients.Split(',', StringSplitOptions.RemoveEmptyEntries);
 
-                    var emailBody = GenerateEmailBodyProtectedB(publicSites);
+                    var scopes = new[] { "user.read", "mail.send" };
+                    var auth = new ROPCConfidentialTokenCredential(log);
+                    var graphClient = new GraphServiceClient(auth, scopes);
 
-                    await SendEmailProB(recipientEmails, emailBody, graphClient, log);
+                    await SendSimpleEmail(recipientEmails, publicSites, graphClient, log);
                 }
 
                 log.LogInformation("Function app executed successfully");
@@ -95,15 +94,7 @@ namespace SiteReviewProB
                 while (siteCollectionPage != null)
                 {
                     log.LogInformation($"Processing {siteCollectionPage.Count} sites from current page.");
-                    foreach (var site in siteCollectionPage)
-                    {
-                        log.LogInformation($"Checking site: {site.DisplayName}, URL: {site.WebUrl}");
-                        if (site.WebUrl.Contains("/teams/b"))
-                        {
-                            log.LogInformation($"Site {site.DisplayName} identified as Protected B.");
-                            sites.Add(site);
-                        }
-                    }
+                    sites.AddRange(siteCollectionPage.Where(site => site.WebUrl.Contains("/teams/b")));
                     if (siteCollectionPage.NextPageRequest != null)
                     {
                         siteCollectionPage = await siteCollectionPage.NextPageRequest.GetAsync();
@@ -148,37 +139,34 @@ namespace SiteReviewProB
             return "Unknown";
         }
 
-        private static string GenerateEmailBodyProtectedB(List<Site> publicSites)
+        private static async Task SendSimpleEmail(string[] recipientEmails, List<Site> publicSites, GraphServiceClient graphClient, ILogger log)
         {
-            var emailBody = "The following Protected B sites are set to public:<br>";
-            foreach (var site in publicSites)
+            var emailContent = FormatSimpleEmailContent(publicSites);
+            var emailMessage = new Message
             {
-                emailBody += $"{site.DisplayName} - {site.WebUrl}<br>";
-            }
-            return emailBody;
-        }
-
-        private static async Task SendEmailProB(string[] recipientEmails, string emailBody, GraphServiceClient graphClient, ILogger log)
-        {
-            var message = new Message
-            {
-                Subject = "Protected B Sites Report",
+                Subject = "ProtectedB Public Sites Report",
                 Body = new ItemBody
                 {
-                    ContentType = BodyType.Html,
-                    Content = emailBody
+                    ContentType = BodyType.Text,
+                    Content = emailContent
                 },
-                ToRecipients = recipientEmails.Select(email => new Recipient
-                {
-                    EmailAddress = new EmailAddress
-                    {
-                        Address = email
-                    }
-                }).ToList()
+                ToRecipients = recipientEmails.Select(email => new Recipient { EmailAddress = new EmailAddress { Address = email } }).ToList()
             };
 
-            await graphClient.Me.SendMail(message, false).Request().PostAsync();
-            log.LogInformation("Report email sent successfully.");
+            try
+            {
+                await graphClient.Me.SendMail(emailMessage, true).Request().PostAsync();
+                log.LogInformation("Report email sent successfully.");
+            }
+            catch (Exception ex)
+            {
+                log.LogError($"Failed to send email: {ex.Message}");
+            }
+        }
+
+        private static string FormatSimpleEmailContent(List<Site> publicSites)
+        {
+            return "The following ProtectedB sites are public:\n" + string.Join("\n", publicSites.Select(site => site.DisplayName));
         }
     }
 }
