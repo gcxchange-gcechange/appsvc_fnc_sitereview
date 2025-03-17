@@ -18,8 +18,7 @@ namespace SiteReviewProB
     {
         [FunctionName("SiteReviewProB")]
         public static async Task<IActionResult> RunProB(
-        [HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequest req,
-        ILogger log, ExecutionContext executionContext)
+        [TimerTrigger("0 0 * * * *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReviewProB timer trigger function executed at: {DateTime.Now}");
 
@@ -70,7 +69,7 @@ namespace SiteReviewProB
                     var auth = new ROPCConfidentialTokenCredential(log);
                     var graphClient = new GraphServiceClient(auth, scopes);
 
-                    await SendSimpleEmail(recipientEmails, publicSites, graphClient, log);
+                    await ProtectedBEmail(recipientEmails, publicSites, graphClient, log);
                 }
 
                 log.LogInformation("Function app executed successfully");
@@ -94,7 +93,17 @@ namespace SiteReviewProB
                 while (siteCollectionPage != null)
                 {
                     log.LogInformation($"Processing {siteCollectionPage.Count} sites from current page.");
-                    sites.AddRange(siteCollectionPage.Where(site => site.WebUrl.Contains("/teams/b")));
+                    foreach (var site in siteCollectionPage)
+                    {
+                        var group = await Common.GetGroupFromSite(site, graphClient, log);
+                        if ((group?.AssignedLabels != null && group.AssignedLabels.Any(label => label.DisplayName.Contains("Protected B"))) ||
+                            site.WebUrl.Contains("/teams/b"))
+                        {
+                            log.LogInformation($"Site {site.DisplayName} classified as Protected B.");
+                            sites.Add(site);
+                        }
+                    }
+
                     if (siteCollectionPage.NextPageRequest != null)
                     {
                         siteCollectionPage = await siteCollectionPage.NextPageRequest.GetAsync();
@@ -139,9 +148,9 @@ namespace SiteReviewProB
             return "Unknown";
         }
 
-        private static async Task SendSimpleEmail(string[] recipientEmails, List<Site> publicSites, GraphServiceClient graphClient, ILogger log)
+        private static async Task ProtectedBEmail(string[] recipientEmails, List<Site> publicSites, GraphServiceClient graphClient, ILogger log)
         {
-            var emailContent = FormatSimpleEmailContent(publicSites);
+            var emailContent = ProtectedBEmailContent(publicSites);
             var emailMessage = new Message
             {
                 Subject = "ProtectedB Public Sites Report",
@@ -164,9 +173,9 @@ namespace SiteReviewProB
             }
         }
 
-        private static string FormatSimpleEmailContent(List<Site> publicSites)
+        private static string ProtectedBEmailContent(List<Site> publicSites)
         {
-            return "The following ProtectedB sites are public:\n" + string.Join("\n", publicSites.Select(site => site.DisplayName));
+            return "The following ProtectedB sites are public:\n" + string.Join("\n", publicSites.Select(site => $"{site.DisplayName}: {site.WebUrl}"));
         }
     }
 }
