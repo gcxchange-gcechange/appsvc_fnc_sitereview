@@ -28,7 +28,6 @@ namespace SiteReview
         public List<ReportData> PrivacySettingSites { get; set; }
         public List<ReportData> ClassificationSites { get; set; }
         public List<ReportData> HubAssociationSites { get; set; }
-        public List<Site> UniqueSites { get; internal set; }
 
         public void AddReportData(ReportData reportData)
         {

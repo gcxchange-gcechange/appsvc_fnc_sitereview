@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Graph;
 using SiteReview;
-using Microsoft.IdentityModel.Tokens;
+using static SiteReview.Auth;
 
 namespace SiteReviewProB
 {
@@ -31,10 +31,13 @@ namespace SiteReviewProB
                     .AddEnvironmentVariables()
                     .Build();
 
-                var graphAPIAuth = new Auth().graphAuth(log);
+                var scopes = new[] { "user.read", "mail.send" };
+                ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
+                var graphClient = new GraphServiceClient(auth, scopes);
+
                 log.LogInformation("Graph API authentication successful.");
 
-                var sites = await GetProtectedBSites(graphAPIAuth, log);
+                var sites = await GetProtectedBSites(graphClient, log);
                 log.LogInformation($"Retrieved {sites.Count} protected B sites.");
 
                 var publicSites = new List<Site>();
@@ -43,7 +46,7 @@ namespace SiteReviewProB
                 {
                     log.LogInformation($"Processing site: {site.DisplayName}");
 
-                    var sitePrivacySetting = await GetSitePrivacySetting(graphAPIAuth, site, log);
+                    var sitePrivacySetting = await GetSitePrivacySetting(graphClient, site, log);
                     log.LogInformation($"Site {site.DisplayName} privacy setting: {sitePrivacySetting}");
 
                     if (sitePrivacySetting == "Public")
@@ -66,12 +69,9 @@ namespace SiteReviewProB
 
                     var recipientEmails = emailRecipients.Split(',', StringSplitOptions.RemoveEmptyEntries);
 
-                    var report = new SiteReport(log)
-                    {
-                        UniqueSites = publicSites
-                    };
+                    var emailBody = GenerateEmailBodyProtectedB(publicSites);
 
-                    await SendReportEmailProB(recipientEmails, report, graphAPIAuth, log);
+                    await SendEmailProB(recipientEmails, emailBody, graphClient, log);
                 }
 
                 log.LogInformation("Function app executed successfully");
@@ -95,7 +95,15 @@ namespace SiteReviewProB
                 while (siteCollectionPage != null)
                 {
                     log.LogInformation($"Processing {siteCollectionPage.Count} sites from current page.");
-                    sites.AddRange(siteCollectionPage.Where(site => site.WebUrl.Contains("/teams/b")));
+                    foreach (var site in siteCollectionPage)
+                    {
+                        log.LogInformation($"Checking site: {site.DisplayName}, URL: {site.WebUrl}");
+                        if (site.WebUrl.Contains("/teams/b"))
+                        {
+                            log.LogInformation($"Site {site.DisplayName} identified as Protected B.");
+                            sites.Add(site);
+                        }
+                    }
                     if (siteCollectionPage.NextPageRequest != null)
                     {
                         siteCollectionPage = await siteCollectionPage.NextPageRequest.GetAsync();
@@ -140,9 +148,37 @@ namespace SiteReviewProB
             return "Unknown";
         }
 
-        private static async Task SendReportEmailProB(string[] recipientEmails, SiteReport report, GraphServiceClient graphAPIAuth, ILogger log)
+        private static string GenerateEmailBodyProtectedB(List<Site> publicSites)
         {
-            await Email.SendReportEmail(recipientEmails, report, graphAPIAuth, log);
+            var emailBody = "The following Protected B sites are set to public:<br>";
+            foreach (var site in publicSites)
+            {
+                emailBody += $"{site.DisplayName} - {site.WebUrl}<br>";
+            }
+            return emailBody;
+        }
+
+        private static async Task SendEmailProB(string[] recipientEmails, string emailBody, GraphServiceClient graphClient, ILogger log)
+        {
+            var message = new Message
+            {
+                Subject = "Protected B Sites Report",
+                Body = new ItemBody
+                {
+                    ContentType = BodyType.Html,
+                    Content = emailBody
+                },
+                ToRecipients = recipientEmails.Select(email => new Recipient
+                {
+                    EmailAddress = new EmailAddress
+                    {
+                        Address = email
+                    }
+                }).ToList()
+            };
+
+            await graphClient.Me.SendMail(message, false).Request().PostAsync();
+            log.LogInformation("Report email sent successfully.");
         }
     }
 }
