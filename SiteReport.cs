@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Graph;
 using System.Collections.Generic;
 using System.Linq;
 
