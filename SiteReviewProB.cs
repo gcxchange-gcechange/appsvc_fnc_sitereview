@@ -17,7 +17,8 @@ namespace SiteReviewProB
     public class SiteReviewProB
     {
         [FunctionName("SiteReviewProB")]
-        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequest req, ILogger log, ExecutionContext executionContext)
+        public static async Task<IActionResult> RunProB(
+        [TimerTrigger("0 */5 * * * *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReviewProB timer trigger function executed at: {DateTime.Now}");
 
