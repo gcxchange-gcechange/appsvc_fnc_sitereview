@@ -14,11 +14,10 @@ using static SiteReview.Auth;
 
 namespace SiteReviewProB
 {
-    public static class SiteReviewProB
+    public class SiteReviewProB
     {
         [FunctionName("SiteReviewProB")]
-        public static async Task<IActionResult> RunProB(
-        [TimerTrigger("0 0 * * * *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequest req, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReviewProB timer trigger function executed at: {DateTime.Now}");
 
