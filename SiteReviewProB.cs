@@ -17,7 +17,7 @@ namespace SiteReviewProB
     public class SiteReviewProB
     {
         [FunctionName("SiteReviewProB")]
-        public static async Task<IActionResult> RunProB(
+        public static async Task Run(
         [TimerTrigger("0 */5 * * * *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReviewProB timer trigger function executed at: {DateTime.Now}");
@@ -78,8 +78,8 @@ namespace SiteReviewProB
             {
                 log.LogError($"An error occurred: {ex.Message}");
             }
-
-            return new OkObjectResult("HTTP trigger executed successfully.");
+            log.LogInformation("Function app pro b executed successfully");
+            //  return new OkObjectResult("HTTP trigger executed successfully.");
         }
 
         private static async Task<List<Site>> GetProtectedBSites(GraphServiceClient graphClient, ILogger log)
