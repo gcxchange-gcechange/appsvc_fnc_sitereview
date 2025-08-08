@@ -1,4 +1,4 @@
-﻿using Microsoft.Graph;
+﻿using Microsoft.Graph.Models;
 using System.Collections.Generic;
 
 namespace SiteReview

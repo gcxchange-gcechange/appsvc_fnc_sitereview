@@ -1,24 +1,18 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using System.Collections.Generic;
-using System.Linq;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using System.Net.Http;
-using System.Net.Http.Headers;
+using Microsoft.Azure.Functions.Worker;
 using static SiteReview.Auth;
 
 namespace SiteReview
 {
     public static class SiteReview
     {
-        [FunctionName("SiteReview")]
+        [Function("SiteReview")]
         public static async Task Run(
-            [TimerTrigger("0 0 0 * * 6")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+            [TimerTrigger("0 0 0 * * 6")] TimerInfo myTimer, ILogger log, FunctionContext executionContext)
             //[HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req, ILogger log, ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReview executed at {DateTime.Now} with report only mode: {Globals.reportOnlyMode}");
@@ -59,11 +53,12 @@ namespace SiteReview
                 // Delete groups and inform owners
                 foreach (var site in report.DeleteSites)
                 {
-                    var s = graphAPIAuth.Sites[site.SiteId]
-                    .Request()
-                    .Header("ConsistencyLevel", "eventual")
-                    .GetAsync()
-                    .Result;
+                    var s = await graphAPIAuth
+                    .Sites[site.SiteId]
+                    .GetAsync(requestConfig =>
+                    {
+                        requestConfig.Headers.Add("ConsistencyLevel", "eventual");
+                    });
 
                     if (s != null)
                     {
@@ -84,7 +79,7 @@ namespace SiteReview
                     }
                 }
 
-                await StoreData.StoreSitesToDelete(executionContext, deleteSiteIds, Common.DeleteSiteIdsContainerName, log);
+                await StoreData.StoreSitesToDelete(deleteSiteIds, Common.DeleteSiteIdsContainerName, log);
             }
 
             //return new OkObjectResult("Function app executed successfully");
