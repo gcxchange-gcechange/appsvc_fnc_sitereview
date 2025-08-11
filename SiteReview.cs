@@ -12,9 +12,9 @@ namespace SiteReview
     {
         [Function("SiteReview")]
         public static async Task Run(
-            [TimerTrigger("0 0 0 * * 6")] TimerInfo myTimer, ILogger log, FunctionContext executionContext)
-            //[HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req, ILogger log, ExecutionContext executionContext)
+            [TimerTrigger("0 0 0 * * 6")] TimerInfo myTimer, FunctionContext executionContext)
         {
+            var log = executionContext.GetLogger("SiteReview");
             log.LogInformation($"SiteReview executed at {DateTime.Now} with report only mode: {Globals.reportOnlyMode}");
 
             var graphAPIAuth = new Auth().graphAuth(log);

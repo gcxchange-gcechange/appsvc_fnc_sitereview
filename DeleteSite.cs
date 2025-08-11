@@ -8,8 +8,9 @@ namespace SiteReview
     {
         [Function("DeleteSites")]
         public static async Task Run(
-            [TimerTrigger("0 0 0 2 1-12 *")] TimerInfo myTimer, ILogger log, FunctionContext executionContext)
+            [TimerTrigger("0 0 0 2 1-12 *")] TimerInfo myTimer, FunctionContext executionContext)
         {
+            var log = executionContext.GetLogger("DeleteSites");
             log.LogInformation($"DeleteSites executed at {System.DateTime.Now}");
 
             if (!Globals.reportOnlyMode)

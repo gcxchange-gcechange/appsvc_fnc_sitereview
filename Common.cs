@@ -75,9 +75,8 @@ namespace SiteReview
                 });
 
                 // Get sites in our hub
-                var hubSitesPage = await graphAPIAuth.Sites.GetAsync(requestConfig =>
+                var hubSitesPage = await graphAPIAuth.Sites[Globals.hubId].Sites.GetAsync(requestConfig =>
                 {
-                    requestConfig.QueryParameters.Search = $"DepartmentId:{Globals.hubId}";
                     requestConfig.Headers.Add("ConsistencyLevel", "eventual");
                 });
 

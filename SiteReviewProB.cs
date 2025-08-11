@@ -19,8 +19,9 @@ namespace SiteReviewProB
     {
         [Function("SiteReviewProB")]
         public static async Task Run(
-        [TimerTrigger("0 0 * * * *")] TimerInfo myTimer, ILogger log, FunctionContext executionContext)
+        [TimerTrigger("0 0 * * * *")] TimerInfo myTimer, FunctionContext executionContext)
         {
+            var log = executionContext.GetLogger("SiteReviewProB");
             log.LogInformation($"SiteReviewProB timer trigger function executed at: {DateTime.Now}");
 
             try
