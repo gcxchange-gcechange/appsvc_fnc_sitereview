@@ -223,7 +223,7 @@ namespace SiteReview
                         return null;
                     }
 
-                    var escapedSiteName = site.Name.Replace(",", "%2C").Replace("&", "%26").Replace("(", "%28").Replace(")", "%29").Replace("é", "%C3%A9").Replace("É", "%C3%89").Replace(" ", "%20").Replace("'", "''");
+                    var escapedSiteName = site.Name.Replace(",", "%2C").Replace("&", "%26").Replace("(", "%28").Replace(")", "%29").Replace("é", "%C3%A9").Replace("É", "%C3%89").Replace("'", "''");//.Replace(" ", "%20");
                     if (escapedSiteName.Length > 100)
                         escapedSiteName = escapedSiteName.Substring(0, 99);
 
