@@ -1,9 +1,12 @@
-﻿using AngleSharp.Dom;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
+using Microsoft.Graph.Models;
+using Microsoft.Graph.Search.Query;
+using Microsoft.Kiota.Abstractions;
 using Microsoft.Online.SharePoint.TenantAdministration;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -21,17 +24,22 @@ namespace SiteReview
             try
             {
                 // Get a report of site usage in the last 180 days
-                var siteReportMsg = graphAPIAuth.Reports
-                .GetSharePointSiteUsageDetail("D180")
-                .Request()
-                .Header("ConsistencyLevel", "eventual")
-                .GetHttpRequestMessage();
+                var requestInfo = new RequestInformation
+                {
+                    HttpMethod = Method.GET,
+                    UrlTemplate = "https://graph.microsoft.com/v1.0/reports/getSharePointSiteUsageDetail(period='D180')",
+                    PathParameters = new Dictionary<string, object>(),
+                };
+                requestInfo.Headers.Add("ConsistencyLevel", "eventual");
+
+                var siteReportResponse = await graphAPIAuth.RequestAdapter.SendPrimitiveAsync<Stream>(requestInfo, cancellationToken: default);
 
                 log.LogInformation("Got site usage report.");
 
+                using var reader = new StreamReader(siteReportResponse);
+
                 // Download the site CSV data
-                var siteReportResponse = await graphAPIAuth.HttpProvider.SendAsync(siteReportMsg);
-                var siteCSV = Helpers.GenerateCSV(await siteReportResponse.Content.ReadAsStringAsync());
+                var siteCSV = Helpers.GenerateCSV(await reader.ReadToEndAsync());
 
                 log.LogInformation($"Site usage report contains data on {siteCSV.Count - 1} sites in total.");
 
@@ -61,28 +69,13 @@ namespace SiteReview
                     log.LogError($"Error retrieving teams usage report: {response.StatusCode}");
                 }
 
-                 var allSites = await graphAPIAuth.Sites
-                .Request()
-                .Header("ConsistencyLevel", "eventual")
-                .GetAsync();
+                var allSites = await graphAPIAuth.Sites.GetAsync(requestConfig =>
+                {
+                    requestConfig.Headers.Add("ConsistencyLevel", "eventual");
+                });
 
                 // Get sites in our hub
-                var sitesQueryOptions = new List<QueryOption>()
-                {
-                    new QueryOption("search", "DepartmentId:{" + Globals.hubId + "}"),
-                };
-
-                var hubSitesPage = await graphAPIAuth.Sites
-                .Request(sitesQueryOptions)
-                .Header("ConsistencyLevel", "eventual")
-                .GetAsync();
-
-                var hubSites = new List<Site>();
-                do
-                {
-                    hubSites.AddRange(hubSitesPage);
-
-                } while (hubSitesPage.NextPageRequest != null && (hubSitesPage = await hubSitesPage.NextPageRequest.GetAsync()).Count > 0);
+                var hubSites = await GetSubSites(Globals.hubId, graphAPIAuth, log);
 
                 log.LogInformation($"Beginning to build your report...");
 
@@ -92,11 +85,11 @@ namespace SiteReview
                 var totalSites = 0;
                 var teamsSites = 0;
 
-                do
+                while (allSites != null)
                 {
-                    log.LogInformation($"{Environment.NewLine}Checking site page {sitePage} containing {allSites.Count} sites...{Environment.NewLine}");
+                    log.LogInformation($"{Environment.NewLine}Checking site page {sitePage} containing {allSites.Value.Count} sites...{Environment.NewLine}");
 
-                    foreach (var site in allSites)
+                    foreach (var site in allSites.Value)
                     {
                         if (excludeSiteIds.Contains(site.Id.Split(",")[1]))
                         {
@@ -136,7 +129,7 @@ namespace SiteReview
                                             $"siteId: {siteCSV[i][siteSiteIdIndex]}{Environment.NewLine}" +
                                             $"lastActivityDate: {siteCSV[i][siteLastActivityIndex]}{Environment.NewLine}" +
                                             $"storageAllocated: {siteCSV[i][siteStorageAllocatedIndex]} Bytes{Environment.NewLine}" +
-                                            $"storageUsed: {siteCSV[i][siteStorageUsedIndex]} Bytes" 
+                                            $"storageUsed: {siteCSV[i][siteStorageUsedIndex]} Bytes"
                                         );
 
                                         siteDaysInactive = lastActivityDate != String.Empty ? (DateTime.Now - DateTime.Parse(lastActivityDate)).TotalDays : Globals.inactiveDaysDelete;
@@ -174,9 +167,18 @@ namespace SiteReview
                     }
 
                     sitePage++;
-                    totalSites += allSites.Count;
+                    totalSites += allSites.Value.Count;
+
+                    if (string.IsNullOrEmpty(allSites.OdataNextLink))
+                    {
+                        allSites = null;
+                    }
+                    else
+                    {
+                        var nextRequestBuilder = new Microsoft.Graph.Sites.SitesRequestBuilder(allSites.OdataNextLink, graphAPIAuth.RequestAdapter);
+                        allSites = await nextRequestBuilder.GetAsync();
+                    }
                 }
-                while (allSites.NextPageRequest != null && (allSites = await allSites.NextPageRequest.GetAsync()).Count > 0);
 
                 log.LogInformation($"{Environment.NewLine}{totalSites} sites were scanned in total.");
                 log.LogInformation($"{teamsSites} of those were found to be teams sites.");
@@ -191,6 +193,76 @@ namespace SiteReview
             }
         }
 
+        public static async Task<List<Site>> GetSubSites(string hubId, GraphServiceClient graphAPIAuth, ILogger log)
+        {
+            var hubSites = new List<Site>();
+            var from = 0;
+            var pageSize = 50;
+            bool moreResults = true;
+
+            try
+            {
+                void ExtractSitesFromHits(List<SearchHit> hits)
+                {
+                    foreach (var hit in hits)
+                    {
+                        if (hit.Resource is Site site)
+                        {
+                            hubSites.Add(site);
+                        }
+                    }
+                }
+
+                while (moreResults)
+                {
+                    var hubSitesReqBody = new QueryPostRequestBody
+                    {
+                        Requests = new List<SearchRequest>
+                    {
+                        new SearchRequest
+                        {
+                            EntityTypes = [Microsoft.Graph.Models.EntityType.Site],
+                            Query = new SearchQuery
+                            {
+                                QueryString = "contentclass=STS_Site"
+                            },
+                            Region = "CAN",
+                            From = from,
+                            Size = pageSize,
+                            AdditionalData = new Dictionary<string, object>
+                            {
+                                { "refinementFilters", new List<string> {
+                                    $"DepartmentId:string(\"{hubId}\",linguistics=off)"
+                                }},
+                                { "trimDuplicates", false }
+                            }
+                        }
+                    }
+                    };
+
+                    var hubSitesSearchRes = await graphAPIAuth.Search.Query.PostAsQueryPostResponseAsync(hubSitesReqBody);
+                    var hits = hubSitesSearchRes.Value?[0]?.HitsContainers?[0]?.Hits;
+
+                    if (hits != null && hits.Count > 0)
+                    {
+                        ExtractSitesFromHits(hits);
+                        from += pageSize;
+                    }
+                    else
+                    {
+                        moreResults = false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogError($"Error getting sub sites for {Globals.hubId} - {ex.Message} - {ex.StackTrace}");
+                return hubSites;
+            }
+
+            return hubSites;
+        }
+
         public static async Task<Group> GetGroupFromSite(Site site, GraphServiceClient graphAPIAuth, ILogger log)
         {
             try
@@ -203,26 +275,44 @@ namespace SiteReview
                         return null;
                     }
 
-                    var escapedSiteName = site.Name.Replace(",", "%2C").Replace("&", "%26").Replace("(", "%28").Replace(")", "%29").Replace("é", "%C3%A9").Replace("É", "%C3%89").Replace(" ", "%20").Replace("'", "''");
+                    var escapedSiteName = site.Name.Replace(",", "%2C").Replace("&", "%26").Replace("(", "%28").Replace(")", "%29").Replace("é", "%C3%A9").Replace("É", "%C3%89").Replace("'", "''");//.Replace(" ", "%20");
                     if (escapedSiteName.Length > 100)
                         escapedSiteName = escapedSiteName.Substring(0, 99);
 
-                    var groups = await graphAPIAuth.Groups
-                    .Request()
-                    .Filter($"startswith(displayName, '{escapedSiteName}')")
-                    .Header("ConsistencyLevel", "eventual")
-                    .Select("id,displayName,mail,mailNickname,groupTypes,visibility,classification,assignedLicenses,assignedLabels")
-                    .GetAsync();
-
-                    do
+                    var groupsResponse = await graphAPIAuth.Groups.GetAsync(requestConfig =>
                     {
-                        foreach (var group in groups)
+                        requestConfig.QueryParameters.Filter = $"startswith(displayName,'{escapedSiteName}')";
+                        requestConfig.Headers.Add("ConsistencyLevel", "eventual");
+                        requestConfig.QueryParameters.Select = new[]
+                        {
+                            "id",
+                            "displayName",
+                            "mail",
+                            "mailNickname",
+                            "groupTypes",
+                            "visibility",
+                            "classification",
+                            "assignedLicenses",
+                            "assignedLabels"
+                        };
+                    });
+
+                    while (groupsResponse != null)
+                    {
+                        foreach (var group in groupsResponse.Value)
                         {
                             if (group.DisplayName == site.Name)
                                 return group;
                         }
+
+                        if (string.IsNullOrEmpty(groupsResponse.OdataNextLink))
+                        {
+                            break;
+                        }
+
+                        var nextRequestBuilder = new Microsoft.Graph.Groups.GroupsRequestBuilder(groupsResponse.OdataNextLink, graphAPIAuth.RequestAdapter);
+                        groupsResponse = await nextRequestBuilder.GetAsync();
                     }
-                    while (groups.NextPageRequest != null && (groups = await groups.NextPageRequest.GetAsync()).Count > 0);
                 }
             }
             catch (Exception e)
@@ -244,26 +334,37 @@ namespace SiteReview
             {
                 if (group != null)
                 {
-                    var owners = await graphAPIAuth.Groups[group.Id].Owners
-                    .Request()
-                    .GetAsync();
+                    var ownersResponse = await graphAPIAuth.Groups[group.Id].Owners.GetAsync();
+                    var owners = ownersResponse.Value;
 
-                    do
+                    while (owners != null)
                     {
                         foreach (var owner in owners)
                         {
-                            var user = await graphAPIAuth.Users[owner.Id]
-                            .Request()
-                            .Select("displayName,mail")
-                            .GetAsync();
-
-                            if (user != null)
+                            if (owner is User userOwner)
                             {
-                                siteOwners.Add(user);
+                                var user = await graphAPIAuth.Users[userOwner.Id]
+                                   .GetAsync(requestConfig =>
+                                   {
+                                       requestConfig.QueryParameters.Select = new[] { "displayName", "mail" };
+                                   });
+
+                                if (user != null)
+                                {
+                                    siteOwners.Add(user);
+                                }
                             }
                         }
+
+                        if (string.IsNullOrEmpty(ownersResponse.OdataNextLink))
+                        {
+                            break;
+                        }
+
+                        var nextRequestBuilder = new Microsoft.Graph.Groups.Item.Owners.OwnersRequestBuilder(ownersResponse.OdataNextLink, graphAPIAuth.RequestAdapter);
+                        ownersResponse = await nextRequestBuilder.GetAsync();
+                        owners = ownersResponse.Value;
                     }
-                    while (owners.NextPageRequest != null && (owners = await owners.NextPageRequest.GetAsync()).Count > 0);
                 }
             }
             catch (Exception ex)
@@ -320,9 +421,7 @@ namespace SiteReview
 
                 var groupId = ctx.Site.GroupId;
 
-                await graphAPIAuth.Groups[groupId.ToString()]
-                .Request()
-                .DeleteAsync();
+                await graphAPIAuth.Groups[groupId.ToString()].DeleteAsync();
             }
             catch (Exception ex)
             {
