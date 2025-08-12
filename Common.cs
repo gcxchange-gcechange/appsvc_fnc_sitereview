@@ -1,7 +1,7 @@
-﻿using AngleSharp.Dom;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
+using Microsoft.Graph.Search.Query;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Online.SharePoint.TenantAdministration;
 using System;
@@ -75,25 +75,7 @@ namespace SiteReview
                 });
 
                 // Get sites in our hub
-                var hubSitesPage = await graphAPIAuth.Sites[Globals.hubId].Sites.GetAsync(requestConfig =>
-                {
-                    requestConfig.Headers.Add("ConsistencyLevel", "eventual");
-                });
-
-                var hubSites = new List<Site>();
-
-                while (hubSitesPage != null)
-                {
-                    hubSites.AddRange(hubSitesPage.Value);
-
-                    if (string.IsNullOrEmpty(hubSitesPage.OdataNextLink))
-                    {
-                        break;
-                    }
-
-                    var nextRequestBuilder = new Microsoft.Graph.Sites.SitesRequestBuilder(hubSitesPage.OdataNextLink, graphAPIAuth.RequestAdapter);
-                    hubSitesPage = await nextRequestBuilder.GetAsync();
-                }
+                var hubSites = await GetSubSites(Globals.hubId, graphAPIAuth, log);
 
                 log.LogInformation($"Beginning to build your report...");
 
@@ -209,6 +191,76 @@ namespace SiteReview
                 log.LogError($"Error building report - {ex.Message} - {ex.StackTrace}");
                 return siteReport;
             }
+        }
+
+        public static async Task<List<Site>> GetSubSites(string hubId, GraphServiceClient graphAPIAuth, ILogger log)
+        {
+            var hubSites = new List<Site>();
+            var from = 0;
+            var pageSize = 50;
+            bool moreResults = true;
+
+            try
+            {
+                void ExtractSitesFromHits(List<SearchHit> hits)
+                {
+                    foreach (var hit in hits)
+                    {
+                        if (hit.Resource is Site site)
+                        {
+                            hubSites.Add(site);
+                        }
+                    }
+                }
+
+                while (moreResults)
+                {
+                    var hubSitesReqBody = new QueryPostRequestBody
+                    {
+                        Requests = new List<SearchRequest>
+                    {
+                        new SearchRequest
+                        {
+                            EntityTypes = [Microsoft.Graph.Models.EntityType.Site],
+                            Query = new SearchQuery
+                            {
+                                QueryString = "contentclass=STS_Site"
+                            },
+                            Region = "CAN",
+                            From = from,
+                            Size = pageSize,
+                            AdditionalData = new Dictionary<string, object>
+                            {
+                                { "refinementFilters", new List<string> {
+                                    $"DepartmentId:string(\"{hubId}\",linguistics=off)"
+                                }},
+                                { "trimDuplicates", false }
+                            }
+                        }
+                    }
+                    };
+
+                    var hubSitesSearchRes = await graphAPIAuth.Search.Query.PostAsQueryPostResponseAsync(hubSitesReqBody);
+                    var hits = hubSitesSearchRes.Value?[0]?.HitsContainers?[0]?.Hits;
+
+                    if (hits != null && hits.Count > 0)
+                    {
+                        ExtractSitesFromHits(hits);
+                        from += pageSize;
+                    }
+                    else
+                    {
+                        moreResults = false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogError($"Error getting sub sites for {Globals.hubId} - {ex.Message} - {ex.StackTrace}");
+                return hubSites;
+            }
+
+            return hubSites;
         }
 
         public static async Task<Group> GetGroupFromSite(Site site, GraphServiceClient graphAPIAuth, ILogger log)
