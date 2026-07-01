@@ -3,7 +3,6 @@ using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Identity.Client;
-using System.Net.Http.Headers;
 using System;
 using Microsoft.SharePoint.Client;
 using PnP.Framework;
@@ -36,25 +35,17 @@ namespace SiteReview
             KeyVaultSecret secret = client.GetSecret(Globals.secretNameClient);
             var secretValue = secret.Value;
 
-            IConfidentialClientApplication confidentialClientApplication = ConfidentialClientApplicationBuilder
-            .Create(Globals.clientId)
-            .WithTenantId(Globals.tenantId)
-            .WithClientSecret(secretValue)
-            .Build();
+            var credential = new ClientSecretCredential(
+                Globals.tenantId,
+                Globals.clientId,
+                secretValue
+            );
 
-            var scopes = new string[] { "https://graph.microsoft.com/.default" };
+            var scopes = new[] { "https://graph.microsoft.com/.default" };
 
-            GraphServiceClient graphServiceClient =
-                new GraphServiceClient(new DelegateAuthenticationProvider(async (requestMessage) =>
-                {
-                    var authResult = await confidentialClientApplication
-                    .AcquireTokenForClient(scopes)
-                    .ExecuteAsync();
+            var graphServiceClient = new GraphServiceClient(credential, scopes);
 
-                    requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authResult.AccessToken);
-                }));
-
-            log.LogInformation($"Created graph service client");
+            log.LogInformation("Created graph service client");
 
             return graphServiceClient;
         }
@@ -68,7 +59,7 @@ namespace SiteReview
                     Delay = TimeSpan.FromSeconds(2),
                     MaxDelay = TimeSpan.FromSeconds(16),
                     MaxRetries = 5,
-                    Mode = Azure.Core.RetryMode.Exponential
+                    Mode = RetryMode.Exponential
                 }
             };
 
@@ -92,7 +83,7 @@ namespace SiteReview
                     Delay = TimeSpan.FromSeconds(2),
                     MaxDelay = TimeSpan.FromSeconds(16),
                     MaxRetries = 5,
-                    Mode = Azure.Core.RetryMode.Exponential
+                    Mode = RetryMode.Exponential
                 }
             };
 

@@ -1,35 +1,34 @@
-﻿using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
+﻿using System.Threading.Tasks;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using Microsoft.Graph;
 
 namespace SiteReview
 {
     internal class DeleteSite
     {
-        [FunctionName("DeleteSites")]
+        [Function("DeleteSites")]
         public static async Task Run(
-            [TimerTrigger("0 0 0 2 1-12 *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+            [TimerTrigger("0 0 0 2 1-12 *")] TimerInfo myTimer, FunctionContext executionContext)
         {
-            log.LogInformation($"DeleteSites executed at {DateTime.Now}");
+            var log = executionContext.GetLogger("DeleteSites");
+            log.LogInformation($"DeleteSites executed at {System.DateTime.Now}");
 
             if (!Globals.reportOnlyMode)
             {
                 var graphAPIAuth = new Auth().graphAuth(log);
 
-                var siteIds = await StoreData.GetSitesToDelete(executionContext, Common.DeleteSiteIdsContainerName, log);
+                var siteIds = await StoreData.GetSitesToDelete(Common.DeleteSiteIdsContainerName, log);
 
                 log.LogInformation($"Found {siteIds.Count} sites to be deleted");
 
                 foreach (var id in siteIds)
                 {
-                    var site = graphAPIAuth.Sites[id]
-                    .Request()
-                    .Header("ConsistencyLevel", "eventual")
-                    .GetAsync()
-                    .Result;
+                    var site = await graphAPIAuth
+                    .Sites[id]
+                    .GetAsync(requestConfig =>
+                    {
+                        requestConfig.Headers.Add("ConsistencyLevel", "eventual");
+                    });
 
                     if (site != null)
                     {

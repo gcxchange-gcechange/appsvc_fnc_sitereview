@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace SiteReview
 {
@@ -15,11 +13,11 @@ namespace SiteReview
     {
         static readonly string FileTitle = "deleteSites.json";
 
-        public static async Task<bool> StoreSitesToDelete(ExecutionContext context, List<string> siteIds, string containerName, ILogger log)
+        public static async Task<bool> StoreSitesToDelete(List<string> siteIds, string containerName, ILogger log)
         {
-            CreateContainerIfNotExists(context, containerName);
+            _ = CreateContainerIfNotExists(containerName);
 
-            var storageAccount = GetCloudStorageAccount(context);
+            var storageAccount = GetCloudStorageAccount();
             var blobClient = storageAccount.CreateCloudBlobClient();
             var container = blobClient.GetContainerReference(containerName);
 
@@ -41,9 +39,9 @@ namespace SiteReview
             return true;
         }
 
-        public static async Task<List<string>> GetSitesToDelete(ExecutionContext context, string containerName, ILogger log)
+        public static async Task<List<string>> GetSitesToDelete(string containerName, ILogger log)
         {
-            var storageAccount = GetCloudStorageAccount(context);
+            var storageAccount = GetCloudStorageAccount();
             var blobClient = storageAccount.CreateCloudBlobClient();
             var container = blobClient.GetContainerReference(containerName);
 
@@ -65,9 +63,9 @@ namespace SiteReview
             return siteIdList;
         }
 
-        private static async void CreateContainerIfNotExists(ExecutionContext executionContext, string ContainerName)
+        private static async Task CreateContainerIfNotExists(string ContainerName)
         {
-            var storageAccount = GetCloudStorageAccount(executionContext);
+            var storageAccount = GetCloudStorageAccount();
             var blobClient = storageAccount.CreateCloudBlobClient();
             string[] containers = new string[] { ContainerName };
 
@@ -78,12 +76,16 @@ namespace SiteReview
             }
         }
 
-        private static CloudStorageAccount GetCloudStorageAccount(ExecutionContext executionContext)
+        private static CloudStorageAccount GetCloudStorageAccount()
         {
+            var basePath = Environment.GetEnvironmentVariable("AzureFunctionsJobRoot") ?? Directory.GetCurrentDirectory();
+
             var config = new ConfigurationBuilder()
-                            .SetBasePath(executionContext.FunctionAppDirectory)
-                            .AddJsonFile("local.settings.json", true, true)
-                            .AddEnvironmentVariables().Build();
+                            .SetBasePath(basePath)
+                            .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
+                            .AddEnvironmentVariables()
+                            .Build();
+
             var storageAccount = CloudStorageAccount.Parse(config["AzureWebJobsStorage"]);
             return storageAccount;
         }
