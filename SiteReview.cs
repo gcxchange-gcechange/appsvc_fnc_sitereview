@@ -59,11 +59,12 @@ namespace SiteReview
                 // Delete groups and inform owners
                 foreach (var site in report.DeleteSites)
                 {
-                    var s = graphAPIAuth.Sites[site.SiteId]
-                    .Request()
-                    .Header("ConsistencyLevel", "eventual")
-                    .GetAsync()
-                    .Result;
+                    var s = await graphAPIAuth
+                    .Sites[site.SiteId]
+                    .GetAsync(requestConfig =>
+                    {
+                        requestConfig.Headers.Add("ConsistencyLevel", "eventual");
+                    });
 
                     if (s != null)
                     {
