@@ -25,11 +25,12 @@ namespace SiteReview
 
                 foreach (var id in siteIds)
                 {
-                    var site = graphAPIAuth.Sites[id]
-                    .Request()
-                    .Header("ConsistencyLevel", "eventual")
-                    .GetAsync()
-                    .Result;
+                    var site = await graphAPIAuth
+                    .Sites[id]
+                    .GetAsync(requestConfig =>
+                    {
+                        requestConfig.Headers.Add("ConsistencyLevel", "eventual");
+                    });
 
                     if (site != null)
                     {

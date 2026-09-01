@@ -7,7 +7,7 @@ namespace SiteReview
     public static class Globals
     {
         // TODO: Add the expected classifications as an app setting once we know which classifications we want to enforce.
-        //       For now the app will flag anything without a classification.
+        //       For now the app will flag anything without a classification
 
         public const string privateSetting = "Private";
         public static readonly string tenantId = GetEnvironmentString("tenantId");

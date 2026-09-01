@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
+using Microsoft.Graph.Models;
 using Microsoft.Identity.Client;
 using System;
 using System.Collections.Generic;
@@ -7,6 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using static SiteReview.Auth;
 using static SiteReview.Common;
+using Microsoft.Graph.Users.Item.SendMail;
 
 namespace SiteReview
 {
@@ -191,10 +193,15 @@ namespace SiteReview
                     }
                 };
 
+                var requestBody = new SendMailPostRequestBody
+                {
+                    Message = message,
+                    SaveToSentItems = true
+                };
+
                 await graphAPIAuth.Users[Globals.emailUserName]
-                .SendMail(message, null)
-                .Request()
-                .PostAsync();
+                .SendMail
+                .PostAsync(requestBody);
 
                 log.LogInformation($"Email sent to {userEmail}");
             }

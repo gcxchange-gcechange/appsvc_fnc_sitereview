@@ -1,19 +1,19 @@
-﻿using Azure.Identity;
+﻿using Azure.Core;
+using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Identity.Client;
-using System.Net.Http.Headers;
-using System;
 using Microsoft.SharePoint.Client;
-using PnP.Framework;
-using System.Threading.Tasks;
-using Azure.Core;
-using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
+using PnP.Framework;
+using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SiteReview
 {
@@ -36,23 +36,15 @@ namespace SiteReview
             KeyVaultSecret secret = client.GetSecret(Globals.secretNameClient);
             var secretValue = secret.Value;
 
-            IConfidentialClientApplication confidentialClientApplication = ConfidentialClientApplicationBuilder
-            .Create(Globals.clientId)
-            .WithTenantId(Globals.tenantId)
-            .WithClientSecret(secretValue)
-            .Build();
+            var credential = new ClientSecretCredential(
+                Globals.tenantId,
+                Globals.clientId,
+                secretValue
+            );
 
             var scopes = new string[] { "https://graph.microsoft.com/.default" };
 
-            GraphServiceClient graphServiceClient =
-                new GraphServiceClient(new DelegateAuthenticationProvider(async (requestMessage) =>
-                {
-                    var authResult = await confidentialClientApplication
-                    .AcquireTokenForClient(scopes)
-                    .ExecuteAsync();
-
-                    requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authResult.AccessToken);
-                }));
+            var graphServiceClient = new GraphServiceClient(credential, scopes);
 
             log.LogInformation($"Created graph service client");
 
@@ -76,7 +68,7 @@ namespace SiteReview
             KeyVaultSecret secret = client.GetSecret(Globals.secretNameAppOnly);
             var secretValue = secret.Value;
 
-            var ctx = new AuthenticationManager().GetACSAppOnlyContext(siteUrl, Globals.appOnlyId, secretValue);
+            var ctx = new PnP.Framework.AuthenticationManager().GetACSAppOnlyContext(siteUrl, Globals.appOnlyId, secretValue);
 
             log.LogInformation($"Created app only client connection for {siteUrl}");
 

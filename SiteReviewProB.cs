@@ -2,15 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Graph;
+using Microsoft.Graph.Models;
 using SiteReview;
 using static SiteReview.Auth;
+using Microsoft.Graph.Sites;
+using Microsoft.Graph.Users.Item.SendMail;
+using System.Threading;
+using Microsoft.Azure.WebJobs;
 
 namespace SiteReviewProB
 {
@@ -18,7 +19,7 @@ namespace SiteReviewProB
     {
         [FunctionName("SiteReviewProB")]
         public static async Task Run(
-        [TimerTrigger("0 0 * * * *")] TimerInfo myTimer, ILogger log, ExecutionContext executionContext)
+        [TimerTrigger("0 0 * * * *")] TimerInfo myTimer, ILogger log, Microsoft.Azure.WebJobs.ExecutionContext executionContext)
         {
             log.LogInformation($"SiteReviewProB timer trigger function executed at: {DateTime.Now}");
 
@@ -89,11 +90,19 @@ namespace SiteReviewProB
 
             try
             {
-                var siteCollectionPage = await graphClient.Sites.Request().GetAsync();
-                while (siteCollectionPage != null)
+
+                var response = await graphClient.Sites.GetAsync(requestConfig =>
                 {
-                    log.LogInformation($"Processing {siteCollectionPage.Count} sites from current page.");
-                    foreach (var site in siteCollectionPage)
+                    requestConfig.Headers.Add("ConsistencyLevel", "eventual");
+                });
+
+                while (response != null)
+                {
+                    var currentSites = response.Value;
+
+                    log.LogInformation($"Processing {currentSites.Count} sites from current page.");
+
+                    foreach (var site in currentSites)
                     {
                         var group = await Common.GetGroupFromSite(site, graphClient, log);
                         if ((group?.AssignedLabels != null && group.AssignedLabels.Any(label => label.DisplayName.Contains("Protected B"))) ||
@@ -104,15 +113,17 @@ namespace SiteReviewProB
                         }
                     }
 
-                    if (siteCollectionPage.NextPageRequest != null)
+                    if (!string.IsNullOrEmpty(response.OdataNextLink))
                     {
-                        siteCollectionPage = await siteCollectionPage.NextPageRequest.GetAsync();
+                        var nextRequestBuilder = new SitesRequestBuilder(response.OdataNextLink, graphClient.RequestAdapter);
+                        response = await nextRequestBuilder.GetAsync();
                     }
                     else
                     {
-                        siteCollectionPage = null;
+                        response = null;
                     }
                 }
+
             }
             catch (Exception ex)
             {
@@ -164,7 +175,14 @@ namespace SiteReviewProB
 
             try
             {
-                await graphClient.Me.SendMail(emailMessage, true).Request().PostAsync();
+                var requestBody = new SendMailPostRequestBody
+                {
+                    Message = emailMessage,
+                    SaveToSentItems = true
+                };
+
+                await graphClient.Users[Globals.emailUserName].SendMail.PostAsync(requestBody);
+
                 log.LogInformation("Report email sent successfully.");
             }
             catch (Exception ex)
@@ -172,6 +190,7 @@ namespace SiteReviewProB
                 log.LogError($"Failed to send email: {ex.Message}");
             }
         }
+
 
         private static string ProtectedBEmailContent(List<Site> publicSites)
         {
